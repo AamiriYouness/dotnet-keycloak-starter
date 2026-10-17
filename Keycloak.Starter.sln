@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Keycloak.Starter.Api", "src\Keycloak.Starter.Api\Keycloak.Starter.Api.csproj", "{164AB031-E4DC-44C4-85A1-B4852952ED2C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "eycloak.Starter.IntegrationTests", "tests\eycloak.Starter.IntegrationTests\eycloak.Starter.IntegrationTests.csproj", "{8618532E-D981-4FC1-A87E-7C6339C206FE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{164AB031-E4DC-44C4-85A1-B4852952ED2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{164AB031-E4DC-44C4-85A1-B4852952ED2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{164AB031-E4DC-44C4-85A1-B4852952ED2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{164AB031-E4DC-44C4-85A1-B4852952ED2C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8618532E-D981-4FC1-A87E-7C6339C206FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8618532E-D981-4FC1-A87E-7C6339C206FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8618532E-D981-4FC1-A87E-7C6339C206FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8618532E-D981-4FC1-A87E-7C6339C206FE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
