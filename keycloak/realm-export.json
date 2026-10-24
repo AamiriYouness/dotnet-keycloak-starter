@@ -1,0 +1,157 @@
+{
+  "realm": "starter",
+  "enabled": true,
+  "sslRequired": "none",
+  "displayName": "Keycloak .NET Starter",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "roles": {
+    "client": {
+      "starter-api": [
+        {
+          "name": "reader",
+          "description": "Read the API's protected reader endpoint"
+        },
+        {
+          "name": "admin",
+          "description": "Access the API's administration endpoint"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "starter-api",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true
+    },
+    {
+      "clientId": "starter-cli",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "local-demo-reader-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "starter-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "starter-admin",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "local-demo-admin-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "starter-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "starter-no-role",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "local-demo-none-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "starter-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "clientScopeMappings": {
+    "starter-api": [
+      {
+        "client": "starter-cli",
+        "roles": [
+          "reader"
+        ]
+      },
+      {
+        "client": "starter-admin",
+        "roles": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "service-account-starter-cli",
+      "enabled": true,
+      "serviceAccountClientId": "starter-cli",
+      "clientRoles": {
+        "starter-api": [
+          "reader"
+        ]
+      }
+    },
+    {
+      "username": "service-account-starter-admin",
+      "enabled": true,
+      "serviceAccountClientId": "starter-admin",
+      "clientRoles": {
+        "starter-api": [
+          "admin"
+        ]
+      }
+    },
+    {
+      "username": "service-account-starter-no-role",
+      "enabled": true,
+      "serviceAccountClientId": "starter-no-role"
+    }
+  ]
+}

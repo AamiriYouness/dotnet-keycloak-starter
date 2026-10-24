@@ -1,0 +1,34 @@
+{
+  "realm": "untrusted-integration-tests",
+  "enabled": true,
+  "sslRequired": "none",
+  "clients": [
+    {
+      "clientId": "test-untrusted",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "integration-test-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ]
+}

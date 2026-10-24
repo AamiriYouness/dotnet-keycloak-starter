@@ -1,23 +1,15 @@
-﻿FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
-USER $APP_UID
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
-
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["src/Keycloak.Starter.Api/Keycloak.Starter.Api.csproj", "src/Keycloak.Starter.Api/"]
-RUN dotnet restore "src/Keycloak.Starter.Api/Keycloak.Starter.Api.csproj"
-COPY . .
-WORKDIR "/src/src/Keycloak.Starter.Api"
-RUN dotnet build "./Keycloak.Starter.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
+COPY global.json .
+COPY src/Keycloak.Starter.Api/Keycloak.Starter.Api.csproj src/Keycloak.Starter.Api/
+RUN dotnet restore src/Keycloak.Starter.Api/Keycloak.Starter.Api.csproj
+COPY src/ src/
+RUN dotnet publish src/Keycloak.Starter.Api/Keycloak.Starter.Api.csproj \
+    --no-restore -c Release -o /app/publish /p:UseAppHost=false
 
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Keycloak.Starter.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
-
-FROM base AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.13 AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+USER $APP_UID
+EXPOSE 8080
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "Keycloak.Starter.Api.dll"]

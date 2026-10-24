@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Keycloak.Starter.Api", "src\Keycloak.Starter.Api\Keycloak.Starter.Api.csproj", "{164AB031-E4DC-44C4-85A1-B4852952ED2C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "eycloak.Starter.IntegrationTests", "tests\eycloak.Starter.IntegrationTests\eycloak.Starter.IntegrationTests.csproj", "{8618532E-D981-4FC1-A87E-7C6339C206FE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Keycloak.Starter.IntegrationTests", "tests\Keycloak.Starter.IntegrationTests\Keycloak.Starter.IntegrationTests.csproj", "{8618532E-D981-4FC1-A87E-7C6339C206FE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

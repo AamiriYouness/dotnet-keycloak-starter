@@ -1,0 +1,307 @@
+{
+  "realm": "starter-integration-tests",
+  "enabled": true,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      {
+        "name": "reader"
+      },
+      {
+        "name": "admin"
+      }
+    ],
+    "client": {
+      "starter-api": [
+        {
+          "name": "reader"
+        },
+        {
+          "name": "admin"
+        }
+      ],
+      "other-api": [
+        {
+          "name": "reader"
+        },
+        {
+          "name": "admin"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "starter-api",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true
+    },
+    {
+      "clientId": "other-api",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true
+    },
+    {
+      "clientId": "test-reader",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "integration-test-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "test-admin",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "integration-test-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "test-unprivileged",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "integration-test-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "test-foreign-roles",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "integration-test-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "test-wrong-audience",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "integration-test-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "other-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "test-short-lived",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "integration-test-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ],
+      "attributes": {
+        "access.token.lifespan": "2"
+      }
+    },
+    {
+      "clientId": "test-malformed-roles",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "integration-test-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "malformed-resource-access",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "resource_access",
+            "claim.value": "not-json",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-test-reader",
+      "enabled": true,
+      "serviceAccountClientId": "test-reader",
+      "clientRoles": {
+        "starter-api": [
+          "reader"
+        ]
+      }
+    },
+    {
+      "username": "service-account-test-admin",
+      "enabled": true,
+      "serviceAccountClientId": "test-admin",
+      "clientRoles": {
+        "starter-api": [
+          "admin"
+        ]
+      }
+    },
+    {
+      "username": "service-account-test-unprivileged",
+      "enabled": true,
+      "serviceAccountClientId": "test-unprivileged"
+    },
+    {
+      "username": "service-account-test-foreign-roles",
+      "enabled": true,
+      "serviceAccountClientId": "test-foreign-roles",
+      "realmRoles": [
+        "reader",
+        "admin"
+      ],
+      "clientRoles": {
+        "other-api": [
+          "reader",
+          "admin"
+        ]
+      }
+    },
+    {
+      "username": "service-account-test-wrong-audience",
+      "enabled": true,
+      "serviceAccountClientId": "test-wrong-audience"
+    },
+    {
+      "username": "service-account-test-short-lived",
+      "enabled": true,
+      "serviceAccountClientId": "test-short-lived"
+    },
+    {
+      "username": "service-account-test-malformed-roles",
+      "enabled": true,
+      "serviceAccountClientId": "test-malformed-roles"
+    }
+  ]
+}
