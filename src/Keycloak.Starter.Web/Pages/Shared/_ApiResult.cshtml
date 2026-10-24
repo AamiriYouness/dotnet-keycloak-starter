@@ -1,0 +1,20 @@
+@model Keycloak.Starter.Web.Services.ApiResult
+<section class="panel" aria-label="API result">
+    <span class="status" data-testid="api-status">HTTP @Model.StatusCode</span>
+    @if (Model.StatusCode == 403)
+    {
+        <h1>Access denied</h1>
+        <p>@Model.Body</p>
+        <a asp-page="/Profile">Return to your profile</a>
+    }
+    else if (Model.StatusCode >= 400)
+    {
+        <h1>Request unavailable</h1>
+        <p>@Model.Body</p>
+    }
+    else
+    {
+        <h2>Request successful</h2>
+        <pre data-testid="api-body">@Model.Body</pre>
+    }
+</section>

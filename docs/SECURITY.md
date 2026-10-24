@@ -41,7 +41,7 @@ The Keycloak image is pinned to 26.8.1 and PostgreSQL to 17.11 in both Compose a
 5. Limit access to the Keycloak Admin Console, management endpoints, database, and infrastructure network. Apply least privilege to role assignments and scope mappings.
 6. Back up PostgreSQL and rehearse migrations before upgrading Keycloak. Startup realm import skips existing realms; the checked-in JSON is a bootstrap template, not a migration system.
 7. Set token lifetime, API rate limits, request size limits, audit retention, monitoring, and log redaction for the actual service.
-8. If adding browser login, use authorization code with PKCE and exact redirect URIs. Public browser/native clients cannot safely store a client secret. Browser login needs its own integration coverage and threat review.
+8. The Razor Pages client uses authorization code with PKCE, exact redirect URIs, and server-side tickets. Preserve its key ring, encrypted tickets, and protecting certificate across deployments. For multiple web replicas, replace the single-instance file ticket store and refresh lock with a shared transactional store and distributed coordination. See [the web guide](WEB.md).
 9. Define application-specific resource and ownership checks before adding business data. An API role alone does not prove ownership of an individual record.
 
 ## Verification

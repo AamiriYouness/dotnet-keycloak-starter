@@ -1,4 +1,6 @@
 **/.git
+**/.local
+**/playwright
 **/.env*
 **/bin
 **/obj

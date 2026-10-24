@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] · Keycloak Starter</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" asp-page="/Index"><span class="brand-mark">K</span> Keycloak Starter</a>
+        <nav aria-label="Main navigation">
+            <a asp-page="/Profile">Profile</a><a asp-page="/Reader">Reader</a><a asp-page="/Admin">Admin</a>
+        </nav>
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <div class="account"><span>@User.Identity.Name</span>
+                <form asp-page="/Account/Logout" method="post">
+                    <button class="button secondary" type="submit">Sign out</button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <a class="button secondary" asp-page="/Account/Login">Sign in</a>
+        }
+    </header>
+    <main class="container">@RenderBody()</main>
+    <footer class="container site-footer">Keycloak + ASP.NET Core · Security starter</footer>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

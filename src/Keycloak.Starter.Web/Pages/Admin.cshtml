@@ -1,0 +1,5 @@
+@page
+@model AdminModel
+@{ ViewData["Title"] = "Admin"; }
+<header class="page-title"><span class="eyebrow">Your workspace</span><h1>Admin</h1><p>Signed in as <strong>@User.Identity?.Name</strong></p></header>
+<partial name="_ApiResult" model="Model.Result" />

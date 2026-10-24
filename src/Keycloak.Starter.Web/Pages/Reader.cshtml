@@ -1,0 +1,5 @@
+@page
+@model ReaderModel
+@{ ViewData["Title"] = "Reader"; }
+<header class="page-title"><span class="eyebrow">Your workspace</span><h1>Reader</h1><p>Signed in as <strong>@User.Identity?.Name</strong></p></header>
+<partial name="_ApiResult" model="Model.Result" />

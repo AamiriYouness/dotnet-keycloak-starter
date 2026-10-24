@@ -31,5 +31,5 @@ The tests intentionally keep `reader` and `admin` independent: an admin does not
 Run only the fast tests that do not require Docker:
 
 ```sh
-dotnet test Keycloak.Starter.sln --filter-not-trait Category=Containers
+dotnet test --project tests/Keycloak.Starter.IntegrationTests/Keycloak.Starter.IntegrationTests.csproj --filter-not-trait Category=Containers
 ```

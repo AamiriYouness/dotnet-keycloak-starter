@@ -23,6 +23,8 @@ jobs:
           dotnet-version: "10.0.x"
       - run: dotnet restore Keycloak.Starter.sln
       - run: dotnet build Keycloak.Starter.sln -c Release --no-restore --warnaserror
+      - name: Install Chromium for browser tests
+        run: pwsh tests/Keycloak.Starter.EndToEndTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
       - run: dotnet test Keycloak.Starter.sln -c Release --no-build
       - name: Start a fresh development stack
         run: docker compose --profile api up -d --build --wait --wait-timeout 180

@@ -7,6 +7,10 @@
 .env
 .env.*
 !.env.example
+**/.local/
+**/playwright/.auth/
+**/playwright-report/
+**/test-results/
 
 # User-specific files
 *.rsuser

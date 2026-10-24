@@ -1,0 +1,21 @@
+@page
+@model IndexModel
+@{ ViewData["Title"] = "Welcome"; }
+<section class="hero">
+    <span class="eyebrow">Identity. Access. Confidence.</span>
+    <h1>One account.<br />The right access.</h1>
+    <p class="lead">Sign in securely and explore how your account's permissions control access to the API.</p>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <a class="button" asp-page="/Profile">Open your profile</a>
+    }
+    else
+    {
+        <a class="button" asp-page="/Account/Login">Sign in with Keycloak</a>
+    }
+</section>
+<div class="cards">
+    <a class="card" asp-page="/Profile"><span class="eyebrow">Your identity</span><h2>Profile</h2><p>View your account and the identity returned by the API.</p><span>Open profile →</span></a>
+    <a class="card" asp-page="/Reader"><span class="eyebrow">Reader permission</span><h2>Reader workspace</h2><p>Access the protected reader endpoint with an authorized account.</p><span>Open workspace →</span></a>
+    <a class="card" asp-page="/Admin"><span class="eyebrow">Admin permission</span><h2>Administration</h2><p>Explore the API endpoint reserved for administrators.</p><span>Open administration →</span></a>
+</div>

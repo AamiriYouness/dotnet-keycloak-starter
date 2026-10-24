@@ -3,6 +3,8 @@
 A portfolio starter demonstrating JWT authentication, API-specific client roles, authorization policies, and integration tests against real Keycloak and PostgreSQL containers.
 
 The API is stateless. PostgreSQL stores Keycloak's configuration and identities. Demo callers use OAuth 2.0 client credentials to authenticate as service accounts.
+The Razor Pages web application also supports browser login through authorization code with PKCE, server-side token storage, and sessions that survive container recreation. See [the web setup and Playwright guide](docs/WEB.md) for the complete browser demo.
+The web guide includes Bash and PowerShell setup, explains the cross-platform PFX certificate format, and shows how the host preparation step differs from Docker image build and container initialization.
 
 ~~~mermaid
 flowchart LR
@@ -117,7 +119,7 @@ The Docker API uses `Keycloak__MetadataAddress` to reach discovery over the inte
 
 ## Tests
 
-Requirements: .NET 10 and a running Docker engine.
+Requirements: .NET 10, a running Docker engine, and Playwright Chromium for the browser suite. Follow the one-time browser installation instructions in [the web guide](docs/WEB.md) before running the full solution. The API integration project can also be run independently.
 
 ~~~sh
 dotnet test Keycloak.Starter.sln
@@ -143,7 +145,7 @@ For deployment, provide HTTPS authority and discovery URLs through deployment co
 
 ## CI
 
-[GitHub Actions](.github/workflows/ci.yml) restores packages, builds Release with warnings as errors, runs the Testcontainers suite, builds a fresh Docker stack, and runs the development smoke checks. It requires no repository secrets.
+[GitHub Actions](.github/workflows/ci.yml) restores packages, builds Release with warnings as errors, installs Chromium, runs the Testcontainers and Playwright suites, builds a fresh Docker stack, and runs the development smoke checks. It requires no repository secrets.
 
 ## Stop, reset, and troubleshoot
 

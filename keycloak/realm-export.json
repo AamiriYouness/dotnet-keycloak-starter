@@ -109,6 +109,43 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "starter-web",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "local-demo-web-secret",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles",
+        "profile"
+      ],
+      "redirectUris": [
+        "https://localhost:7002/signin-oidc"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://localhost:7002/signout-callback-oidc"
+      },
+      "protocolMappers": [
+        {
+          "name": "starter-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "clientScopeMappings": {
@@ -122,6 +159,13 @@
       {
         "client": "starter-admin",
         "roles": [
+          "admin"
+        ]
+      },
+      {
+        "client": "starter-web",
+        "roles": [
+          "reader",
           "admin"
         ]
       }
@@ -152,6 +196,61 @@
       "username": "service-account-starter-no-role",
       "enabled": true,
       "serviceAccountClientId": "starter-no-role"
+    },
+    {
+      "username": "demo-reader",
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "demo-reader",
+      "email": "demo-reader@example.test",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-reader-password",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "starter-api": [
+          "reader"
+        ]
+      }
+    },
+    {
+      "username": "demo-admin",
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "demo-admin",
+      "email": "demo-admin@example.test",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-admin-user-password",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "starter-api": [
+          "admin"
+        ]
+      }
+    },
+    {
+      "username": "demo-unprivileged",
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "demo-unprivileged",
+      "email": "demo-unprivileged@example.test",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-user-password",
+          "temporary": false
+        }
+      ]
     }
   ]
 }
