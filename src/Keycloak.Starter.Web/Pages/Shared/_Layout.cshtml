@@ -10,7 +10,7 @@
     <header class="site-header">
         <a class="brand" asp-page="/Index"><span class="brand-mark">K</span> Keycloak Starter</a>
         <nav aria-label="Main navigation">
-            <a asp-page="/Profile">Profile</a><a asp-page="/Reader">Reader</a><a asp-page="/Admin">Admin</a>
+            <a asp-page="/Profile">Profile</a><a asp-page="/Reader">Reader</a><a asp-page="/Transactions">Transactions</a><a asp-page="/Admin">Admin</a>
         </nav>
         @if (User.Identity?.IsAuthenticated == true)
         {
