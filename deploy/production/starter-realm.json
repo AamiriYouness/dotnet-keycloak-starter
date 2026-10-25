@@ -1,0 +1,163 @@
+{
+  "realm": "starter",
+  "enabled": true,
+  "sslRequired": "all",
+  "displayName": "Keycloak .NET Starter",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "roles": {
+    "client": {
+      "starter-api": [
+        {
+          "name": "reader",
+          "description": "Read the API's protected reader endpoint"
+        },
+        {
+          "name": "admin",
+          "description": "Access the API's administration endpoint"
+        },
+        {
+          "name": "sync",
+          "description": "Run the worker synchronization check"
+        }
+      ],
+      "starter-transactions": [
+        {
+          "name": "read-transactions",
+          "description": "Read transactions on behalf of a user"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "starter-api",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": false,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${STARTER_EXCHANGE_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "attributes": {
+        "standard.token.exchange.enabled": "true"
+      }
+    },
+    {
+      "clientId": "starter-web",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${STARTER_WEB_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles",
+        "profile"
+      ],
+      "redirectUris": [
+        "${STARTER_WEB_ORIGIN}/signin-oidc"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${STARTER_WEB_ORIGIN}/signout-callback-oidc"
+      },
+      "protocolMappers": [
+        {
+          "name": "starter-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "starter-transactions",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true,
+      "fullScopeAllowed": false
+    },
+    {
+      "clientId": "starter-worker",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${STARTER_WORKER_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "starter-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "clientScopeMappings": {
+    "starter-api": [
+      {
+        "client": "starter-web",
+        "roles": [
+          "reader",
+          "admin"
+        ]
+      },
+      {
+        "client": "starter-worker",
+        "roles": [
+          "sync"
+        ]
+      }
+    ],
+    "starter-transactions": [
+      {
+        "client": "starter-api",
+        "roles": [
+          "read-transactions"
+        ]
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "service-account-starter-worker",
+      "enabled": true,
+      "serviceAccountClientId": "starter-worker",
+      "clientRoles": {
+        "starter-api": [
+          "sync"
+        ]
+      }
+    }
+  ]
+}

@@ -1,6 +1,9 @@
 #!/bin/bash
 # Runs once on first Postgres start. Keycloak owns its database, without superuser privileges.
 set -euo pipefail
+if [ -n "${KEYCLOAK_DB_PASSWORD_FILE:-}" ]; then
+    KEYCLOAK_DB_PASSWORD=$(cat "$KEYCLOAK_DB_PASSWORD_FILE")
+fi
 : "${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD is required}"
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \

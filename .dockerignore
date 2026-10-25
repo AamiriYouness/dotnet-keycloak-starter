@@ -11,3 +11,4 @@
 **/*.user
 **/*.pfx
 **/*.key
+deploy/production/secrets

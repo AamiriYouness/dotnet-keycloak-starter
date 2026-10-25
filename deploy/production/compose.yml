@@ -1,0 +1,275 @@
+# Standalone deployment file. Do not merge with the development docker-compose.yml.
+services:
+  gateway:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    environment:
+      WEB_HOST: ${WEB_HOST:?Set WEB_HOST}
+      AUTH_HOST: ${AUTH_HOST:?Set AUTH_HOST}
+      HTTPS_PORT: ${HTTPS_PORT:-443}
+      HTTP_PORT: ${HTTP_PORT:-80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    secrets: [tls-chain.pem, tls-key.pem]
+    ports:
+      - "${EDGE_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:${HTTPS_PORT:-443}"
+      - "${EDGE_BIND:-0.0.0.0}:${HTTP_PORT:-80}:${HTTP_PORT:-80}"
+    networks:
+      application:
+        ipv4_address: ${EDGE_PROXY_IP:-172.30.50.2}
+        aliases: ["${AUTH_HOST:?Set AUTH_HOST}"]
+    depends_on:
+      web:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/health]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    tmpfs: [/data, /config]
+
+  internal-proxy:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    environment:
+      ACCOUNTS_HOST: ${ACCOUNTS_HOST:?Set ACCOUNTS_HOST}
+      TRANSACTIONS_HOST: ${TRANSACTIONS_HOST:?Set TRANSACTIONS_HOST}
+    volumes:
+      - ./Caddyfile.internal:/etc/caddy/Caddyfile:ro
+    secrets: [tls-chain.pem, tls-key.pem]
+    networks:
+      application:
+        ipv4_address: ${INTERNAL_PROXY_IP:-172.30.50.3}
+        aliases: ["${ACCOUNTS_HOST:?Set ACCOUNTS_HOST}", "${TRANSACTIONS_HOST:?Set TRANSACTIONS_HOST}"]
+    depends_on:
+      api:
+        condition: service_healthy
+      transactions:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/health]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    tmpfs: [/data, /config]
+
+  postgres:
+    image: postgres:17.11
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres-admin-password
+      KEYCLOAK_DB_PASSWORD_FILE: /run/secrets/keycloak-db-password
+    secrets: [postgres-admin-password, keycloak-db-password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../../db/init:/docker-entrypoint-initdb.d:ro
+    networks: [database]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d postgres]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  keycloak:
+    build:
+      context: ../..
+      dockerfile: deploy/production/Keycloak.Dockerfile
+    restart: unless-stopped
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:?Set KEYCLOAK_ADMIN_USER}
+      KC_HOSTNAME: ${KEYCLOAK_ORIGIN:?Set KEYCLOAK_ORIGIN to the public HTTPS origin}
+      KC_HOSTNAME_STRICT: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_PROXY_TRUSTED_ADDRESSES: ${EDGE_PROXY_IP:-172.30.50.2}
+      KC_CACHE: local
+      STARTER_WEB_ORIGIN: ${WEB_ORIGIN:?Set WEB_ORIGIN to the public HTTPS origin}
+    secrets: [keycloak-db-password, keycloak-admin-password, web-client-secret, exchange-client-secret, worker-client-secret]
+    volumes:
+      - ${PRODUCTION_REALM_FILE:-./starter-realm.json}:/opt/keycloak/data/import/starter-realm.json:ro
+    networks: [application, database]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, bash, -ec, "{ printf 'HEAD /health/ready HTTP/1.0\r\n\r\n' >&0; grep -q ' 200 '; } 0<>/dev/tcp/localhost/9000"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 30
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: src/Keycloak.Starter.Api/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ASPNETCORE_HTTPS_PORT: "443"
+      AllowedHosts: ${ACCOUNTS_HOST:?Set ACCOUNTS_HOST}
+      Keycloak__Authority: ${KEYCLOAK_ORIGIN:?Set KEYCLOAK_ORIGIN}/realms/starter
+      Keycloak__Audience: starter-api
+      TokenExchange__Enabled: "true"
+      TokenExchange__TransactionsUrl: https://${TRANSACTIONS_HOST:?Set TRANSACTIONS_HOST}
+      ReverseProxy__Enabled: "true"
+      ReverseProxy__KnownProxies__0: ${INTERNAL_PROXY_IP:-172.30.50.3}
+      SSL_CERT_FILE: /run/secrets/ca-bundle.pem
+    secrets:
+      - source: api-settings
+        target: appsettings.json
+      - ca-bundle.pem
+    networks: [application]
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, bash, -ec, "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  transactions:
+    build:
+      context: ../..
+      dockerfile: src/Keycloak.Starter.Transactions/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ASPNETCORE_HTTPS_PORT: "443"
+      AllowedHosts: ${TRANSACTIONS_HOST:?Set TRANSACTIONS_HOST}
+      Keycloak__Authority: ${KEYCLOAK_ORIGIN:?Set KEYCLOAK_ORIGIN}/realms/starter
+      ReverseProxy__Enabled: "true"
+      ReverseProxy__KnownProxies__0: ${INTERNAL_PROXY_IP:-172.30.50.3}
+      SSL_CERT_FILE: /run/secrets/ca-bundle.pem
+    secrets: [ca-bundle.pem]
+    networks: [application]
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, bash, -ec, "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  web:
+    build:
+      context: ../..
+      dockerfile: src/Keycloak.Starter.Web/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_HTTPS_PORT: ${HTTPS_PORT:-443}
+      AllowedHosts: ${WEB_HOST:?Set WEB_HOST}
+      Keycloak__Authority: ${KEYCLOAK_ORIGIN:?Set KEYCLOAK_ORIGIN}/realms/starter
+      Keycloak__ClientId: starter-web
+      Api__BaseUrl: https://${ACCOUNTS_HOST:?Set ACCOUNTS_HOST}
+      Authentication__StoragePath: /app/authentication
+      DataProtection__CertificatePath: /run/secrets/key-protection.pfx
+      ReverseProxy__Enabled: "true"
+      ReverseProxy__KnownProxies__0: ${EDGE_PROXY_IP:-172.30.50.2}
+      SSL_CERT_FILE: /run/secrets/ca-bundle.pem
+    secrets:
+      - source: web-settings
+        target: appsettings.json
+      - key-protection.pfx
+      - ca-bundle.pem
+    volumes: [web-auth:/app/authentication]
+    networks: [application]
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      internal-proxy:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, bash, -ec, "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: src/Keycloak.Starter.Worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      Worker__Authority: ${KEYCLOAK_ORIGIN:?Set KEYCLOAK_ORIGIN}/realms/starter
+      Worker__ApiUrl: https://${ACCOUNTS_HOST:?Set ACCOUNTS_HOST}
+      SSL_CERT_FILE: /run/secrets/ca-bundle.pem
+      Logging__LogLevel__System.Net.Http.HttpClient: Warning
+    secrets:
+      - source: worker-settings
+        target: appsettings.json
+      - ca-bundle.pem
+    networks: [application]
+    depends_on:
+      gateway:
+        condition: service_healthy
+      internal-proxy:
+        condition: service_healthy
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+networks:
+  application:
+    ipam:
+      config:
+        - subnet: ${APPLICATION_SUBNET:-172.30.50.0/24}
+          ip_range: ${APPLICATION_DYNAMIC_RANGE:-172.30.50.128/25}
+  database:
+    internal: true
+volumes:
+  pgdata:
+  web-auth:
+# Compose secret mounts are read-only. File permissions are set during preparation.
+secrets:
+  tls-chain.pem:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/tls-chain.pem
+  tls-key.pem:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/tls-key.pem
+  ca-bundle.pem:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/ca-bundle.pem
+  postgres-admin-password:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/postgres-admin-password
+  keycloak-db-password:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/keycloak-db-password
+  keycloak-admin-password:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/keycloak-admin-password
+  web-client-secret:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/web-client-secret
+  exchange-client-secret:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/exchange-client-secret
+  worker-client-secret:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/worker-client-secret
+  api-settings:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/api.json
+  web-settings:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/web.json
+  worker-settings:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/worker.json
+  key-protection.pfx:
+    file: ${DEPLOYMENT_SECRETS_DIR:?Set DEPLOYMENT_SECRETS_DIR}/key-protection.pfx
