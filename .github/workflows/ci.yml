@@ -27,7 +27,9 @@ jobs:
         run: pwsh tests/Keycloak.Starter.EndToEndTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
       - run: dotnet test Keycloak.Starter.sln -c Release --no-build
       - name: Start a fresh development stack
-        run: docker compose --profile api up -d --build --wait --wait-timeout 180
+        run: |
+          bash scripts/prepare-web.sh
+          docker compose up -d --build --wait --wait-timeout 180
       - name: Exercise the imported demo realm
         run: python3 scripts/smoke-test.py
       - name: Show container logs on failure

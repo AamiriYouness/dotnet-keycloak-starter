@@ -47,7 +47,6 @@ services:
       retries: 30
 
   api:
-    profiles: ["api", "web"]
     build:
       context: .
       dockerfile: src/Keycloak.Starter.Api/Dockerfile
@@ -56,6 +55,9 @@ services:
       ASPNETCORE_HTTP_PORTS: "8080"
       Keycloak__Authority: http://localhost:${KEYCLOAK_PORT:-8080}/realms/starter
       Keycloak__Audience: starter-api
+      TokenExchange__Enabled: "true"
+      TokenExchange__ClientSecret: ${EXCHANGE_CLIENT_SECRET:-local-demo-exchange-secret}
+      TokenExchange__TransactionsUrl: http://transactions:8080
       Keycloak__MetadataAddress: http://keycloak:8080/realms/starter/.well-known/openid-configuration
     ports:
       - "127.0.0.1:${API_PORT:-5150}:8080"
@@ -76,8 +78,48 @@ services:
       timeout: 3s
       retries: 12
 
+  transactions:
+    build:
+      context: .
+      dockerfile: src/Keycloak.Starter.Transactions/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      Keycloak__Authority: http://localhost:${KEYCLOAK_PORT:-8080}/realms/starter
+      Keycloak__MetadataAddress: http://keycloak:8080/realms/starter/.well-known/openid-configuration
+    ports:
+      - "127.0.0.1:${TRANSACTIONS_PORT:-5160}:8080"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "{ printf 'GET /health HTTP/1.0\r\nHost: localhost\r\n\r\n' >&0; grep -q ' 200 '; } 0<>/dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  worker:
+    build:
+      context: .
+      dockerfile: src/Keycloak.Starter.Worker/Dockerfile
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      Worker__Authority: http://localhost:${KEYCLOAK_PORT:-8080}/realms/starter
+      Worker__MetadataAddress: http://keycloak:8080/realms/starter/.well-known/openid-configuration
+      Worker__ClientSecret: ${WORKER_CLIENT_SECRET:-local-demo-worker-secret}
+      Worker__ApiUrl: http://api:8080
+      Logging__LogLevel__System.Net.Http.HttpClient: Warning
+    depends_on:
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+
   web-cert-init:
-    profiles: ["web"]
     image: mcr.microsoft.com/dotnet/aspnet:10.0.13
     user: "0"
     network_mode: none
@@ -89,7 +131,6 @@ services:
       - web-certs:/certs
 
   web:
-    profiles: ["web"]
     build:
       context: .
       dockerfile: src/Keycloak.Starter.Web/Dockerfile
@@ -115,6 +156,8 @@ services:
       web-cert-init:
         condition: service_completed_successfully
       api:
+        condition: service_healthy
+      transactions:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true

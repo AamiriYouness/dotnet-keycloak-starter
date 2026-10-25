@@ -15,6 +15,16 @@
         {
           "name": "admin",
           "description": "Access the API's administration endpoint"
+        },
+        {
+          "name": "sync",
+          "description": "Run the worker synchronization check"
+        }
+      ],
+      "starter-transactions": [
+        {
+          "name": "read-transactions",
+          "description": "Read transactions on behalf of a user"
         }
       ]
     }
@@ -24,7 +34,21 @@
       "clientId": "starter-api",
       "enabled": true,
       "protocol": "openid-connect",
-      "bearerOnly": true
+      "bearerOnly": false,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "local-demo-exchange-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "attributes": {
+        "standard.token.exchange.enabled": "true"
+      }
     },
     {
       "clientId": "starter-cli",
@@ -146,6 +170,41 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "starter-transactions",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true,
+      "fullScopeAllowed": false
+    },
+    {
+      "clientId": "starter-worker",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "local-demo-worker-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "starter-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "starter-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "clientScopeMappings": {
@@ -167,6 +226,20 @@
         "roles": [
           "reader",
           "admin"
+        ]
+      },
+      {
+        "client": "starter-worker",
+        "roles": [
+          "sync"
+        ]
+      }
+    ],
+    "starter-transactions": [
+      {
+        "client": "starter-api",
+        "roles": [
+          "read-transactions"
         ]
       }
     ]
@@ -214,6 +287,9 @@
       "clientRoles": {
         "starter-api": [
           "reader"
+        ],
+        "starter-transactions": [
+          "read-transactions"
         ]
       }
     },
@@ -251,6 +327,16 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "username": "service-account-starter-worker",
+      "enabled": true,
+      "serviceAccountClientId": "starter-worker",
+      "clientRoles": {
+        "starter-api": [
+          "sync"
+        ]
+      }
     }
   ]
 }
