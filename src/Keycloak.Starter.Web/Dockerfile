@@ -2,6 +2,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY global.json .
 COPY src/Keycloak.Starter.Web/Keycloak.Starter.Web.csproj src/Keycloak.Starter.Web/
+COPY src/Keycloak.Starter.Authentication/Keycloak.Starter.Authentication.csproj src/Keycloak.Starter.Authentication/
 RUN dotnet restore src/Keycloak.Starter.Web/Keycloak.Starter.Web.csproj
 COPY src/ src/
 RUN dotnet publish src/Keycloak.Starter.Web/Keycloak.Starter.Web.csproj \

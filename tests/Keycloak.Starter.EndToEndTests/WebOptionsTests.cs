@@ -39,6 +39,7 @@ public sealed class WebOptionsTests : IDisposable
             ["DataProtection:CertificatePath"] = _certificate,
             ["DataProtection:CertificatePassword"] = "options-test-password"
         };
+        if (environment == "Production") values["Authentication:StoragePath"] = Path.Combine(_root, "authentication");
         foreach (var (key, value) in overrides ?? [])
         {
             values[key] = value;
@@ -56,6 +57,8 @@ public sealed class WebOptionsTests : IDisposable
     [InlineData("Keycloak:MetadataAddress", "http://keycloak.example/discovery", "Keycloak:MetadataAddress")]
     [InlineData("Api:BaseUrl", "http://api.example", "Api:BaseUrl")]
     [InlineData("Authentication:RefreshBeforeExpirySeconds", "0", "Authentication:RefreshBeforeExpirySeconds")]
+    [InlineData("Authentication:StoragePath", "", "Authentication:StoragePath")]
+    [InlineData("DataProtection:CertificatePassword", "wrong-password", "DataProtection:CertificatePath")]
     [InlineData("Authentication:StoragePath", "relative-path", "Authentication:StoragePath")]
     [InlineData("DataProtection:CertificatePath", "", "DataProtection:CertificatePath")]
     [InlineData("DataProtection:CertificatePath", "/missing/starter-certificate.pfx", "DataProtection:CertificatePath")]
