@@ -12,7 +12,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeFolder("/");
-    foreach (var page in new[] { "/Index", "/SignedOut", "/Error", "/Account/Login" })
+    foreach (var page in new[] { "/Index", "/SignedOut", "/Error", "/Privacy", "/Account/Login" })
     {
         options.Conventions.AllowAnonymousToPage(page);
     }

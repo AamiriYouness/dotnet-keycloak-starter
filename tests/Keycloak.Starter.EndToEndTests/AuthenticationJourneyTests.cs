@@ -17,6 +17,20 @@ public abstract class BrowserJourneys(WebFixture fixture)
     }
 
     [Fact]
+    public async Task Privacy_notice_is_public_and_explains_demo_data_handling()
+    {
+        await using var context = await fixture.NewContextAsync();
+        var page = await context.NewPageAsync();
+        await page.GotoAsync(fixture.WebUrl);
+        await page.GetByRole(AriaRole.Link, new() { Name = "Privacy and demo data", Exact = true }).ClickAsync();
+        Assert.Equal(fixture.WebUrl + "/Privacy", page.Url);
+        await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Privacy and demo data", Exact = true })).ToBeVisibleAsync();
+        await Expect(page.Locator("main")).ToContainTextAsync("encrypted reference");
+        await Expect(page.Locator("main")).ToContainTextAsync("fixed sample response");
+        await Expect(page.Locator("main")).Not.ToContainTextAsync("Use this page to detail");
+    }
+
+    [Fact]
     public async Task Anonymous_protected_request_redirects_to_keycloak_with_pkce()
     {
         await using var context = await fixture.NewContextAsync();

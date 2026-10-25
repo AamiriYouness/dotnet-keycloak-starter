@@ -1,8 +1,29 @@
-﻿@page
+@page
 @model PrivacyModel
-@{
-    ViewData["Title"] = "Privacy Policy";
-}
-<h1>@ViewData["Title"]</h1>
-
-<p>Use this page to detail your site's privacy policy.</p>
+@{ ViewData["Title"] = "Privacy and demo data"; }
+<header class="page-title">
+    <span class="eyebrow">About this demonstration</span>
+    <h1>Privacy and demo data</h1>
+    <p>This page describes how the starter handles sign-in and sample data.</p>
+</header>
+<section class="panel" aria-labelledby="identity-storage">
+    <h2 id="identity-storage">Account and session data</h2>
+    <p>Keycloak manages account details, credentials, roles, and sign-in sessions in its database.</p>
+    <p>The Web application stores your authentication ticket and access, refresh, and ID tokens on the server, encrypted using ASP.NET Core Data Protection. Its browser session cookie contains an encrypted reference to that ticket.</p>
+    <p>Keycloak also uses cookies for its sign-in session. Short-lived OpenID Connect correlation and nonce cookies protect the login flow, and an antiforgery token protects sign-out requests.</p>
+</section>
+<section class="panel" aria-labelledby="sample-responses">
+    <h2 id="sample-responses">What the pages display</h2>
+    <p>Profile shows the subject identifier returned by the authenticated API. Transactions displays a fixed sample response and the authenticated subject; it does not contain real financial records or demonstrate ownership checks.</p>
+    <p>Raw access, refresh, and ID tokens are not displayed on these pages. The worker uses its own service account and does not act as a signed-in browser user.</p>
+</section>
+<section class="panel" aria-labelledby="session-lifetime">
+    <h2 id="session-lifetime">Sign-out and retention</h2>
+    <p>Web sessions have a maximum lifetime of eight hours. Signing out removes the Web session ticket and initiates sign-out at Keycloak. It does not delete your Keycloak account.</p>
+    <p>Server-side tickets and the key ring persist across container recreation. Removing deployment volumes also removes their stored data; restarting a container alone does not.</p>
+</section>
+<section class="panel" aria-labelledby="deployment-data">
+    <h2 id="deployment-data">Using this starter</h2>
+    <p>The local accounts and sample passwords are public demonstration credentials. Use sample data when exploring the demo.</p>
+    <p>The starter does not add advertising or analytics scripts. A deployed application may collect additional data through its own features, logging, hosting, and monitoring. Its operator should describe that behavior in the deployed site's privacy notice.</p>
+</section>
