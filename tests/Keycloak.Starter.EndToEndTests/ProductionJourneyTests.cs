@@ -101,6 +101,52 @@ public sealed class ProductionJourneyTests(ProductionWebFixture fixture)
     }
 
     [Fact]
+    public async Task Checked_backup_script_produces_restorable_database_and_key_ring()
+    {
+        using var client = fixture.CreateHttpClient();
+        using var challenge = await client.GetAsync(fixture.WebUrl + "/Profile", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Redirect, challenge.StatusCode);
+        var backup = await fixture.CreateCheckedBackupAsync();
+        Assert.True(File.Exists(Path.Combine(backup, "COMPLETE")));
+        Assert.False(File.Exists(Path.Combine(backup, "INCOMPLETE")));
+        foreach (var file in new[] { "keycloak.dump", "web-auth.tar.gz", "secrets.tar.gz", "deployment-model.json", "images.json" })
+            Assert.True(new FileInfo(Path.Combine(backup, file)).Length > 0);
+        await fixture.ComposeAsync("cp", Path.Combine(backup, "keycloak.dump"), "postgres:/tmp/checked-backup.dump");
+        var clients = await fixture.ComposeAsync("exec", "-T", "postgres", "sh", "-ec",
+            "createdb -U postgres -O keycloak checked_backup_restore && " +
+            "pg_restore -U postgres --no-owner --role=keycloak --exit-on-error -d checked_backup_restore /tmp/checked-backup.dump && " +
+            "psql -U postgres -d checked_backup_restore -Atc 'SELECT count(*) FROM client'");
+        Assert.True(int.TryParse(clients.Trim(), out var count) && count >= 4);
+        await fixture.ComposeAsync("cp", Path.Combine(backup, "web-auth.tar.gz"), "web:/tmp/checked-web-backup.tar.gz");
+        await fixture.ComposeAsync("exec", "-T", "web", "bash", "-ec",
+            "mkdir /tmp/checked-web-restore && tar -C /tmp/checked-web-restore -xzf /tmp/checked-web-backup.tar.gz && " +
+            "test -n \"$(find /tmp/checked-web-restore/keys -name '*.xml' -print -quit)\"");
+    }
+
+    [Fact]
+    public async Task Recovery_example_separates_publication_from_canonical_ports_and_uses_restored_secrets()
+    {
+        using var model = JsonDocument.Parse(await fixture.RenderRecoveryConfigurationAsync());
+        var services = model.RootElement.GetProperty("services");
+        var gateway = services.GetProperty("gateway");
+        Assert.Equal("443", gateway.GetProperty("environment").GetProperty("HTTPS_PORT").GetString());
+        foreach (var port in gateway.GetProperty("ports").EnumerateArray())
+        {
+            Assert.Equal("127.0.0.1", port.GetProperty("host_ip").GetString());
+            var published = port.GetProperty("published").GetString();
+            Assert.True((published == "18443" && port.GetProperty("target").GetInt32() == 443) ||
+                        (published == "18080" && port.GetProperty("target").GetInt32() == 80));
+        }
+        var range = model.RootElement.GetProperty("networks").GetProperty("application").GetProperty("ipam").GetProperty("config")[0];
+        Assert.Equal("172.30.60.0/24", range.GetProperty("subnet").GetString());
+        Assert.Equal("172.30.60.128/25", range.GetProperty("ip_range").GetString());
+        Assert.Equal("172.30.60.2", gateway.GetProperty("networks").GetProperty("application").GetProperty("ipv4_address").GetString());
+        Assert.Equal("172.30.60.3", services.GetProperty("internal-proxy").GetProperty("networks").GetProperty("application").GetProperty("ipv4_address").GetString());
+        foreach (var secret in model.RootElement.GetProperty("secrets").EnumerateObject())
+            Assert.StartsWith("/srv/keycloak-starter/restored-secrets-check/", secret.Value.GetProperty("file").GetString());
+    }
+
+    [Fact]
     public async Task Postgres_backup_can_be_restored_into_an_isolated_database()
     {
         var result = await fixture.ComposeAsync("exec", "-T", "postgres", "sh", "-ec",

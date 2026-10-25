@@ -10,7 +10,7 @@ namespace Keycloak.Starter.EndToEndTests;
 
 public class WebFixture : IAsyncLifetime
 {
-    private readonly string _project = "starter-e2e-" + Guid.NewGuid().ToString("N")[..12];
+    protected readonly string _project = "starter-e2e-" + Guid.NewGuid().ToString("N")[..12];
     protected readonly string _temporary = Path.Combine(Path.GetTempPath(), "starter-e2e-" + Guid.NewGuid().ToString("N"));
     protected readonly Dictionary<string, string> _environment = new();
     protected string _root = "";

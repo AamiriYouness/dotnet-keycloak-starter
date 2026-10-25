@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -129,6 +130,52 @@ public sealed class ProductionWebFixture : WebFixture
         };
         return new HttpClient(handler);
     }
+    private async Task<string> RunOperationAsync(ProcessStartInfo start)
+    {
+        start.WorkingDirectory = _root;
+        start.RedirectStandardOutput = true;
+        start.RedirectStandardError = true;
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Operation did not start.");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(5));
+        try { await process.WaitForExitAsync(timeout.Token); }
+        catch { process.Kill(entireProcessTree: true); throw; }
+        var output = await stdout;
+        var error = await stderr;
+        if (process.ExitCode != 0) throw new InvalidOperationException("Deployment operation failed: " + error + output);
+        return output;
+    }
+
+    public async Task<string> CreateCheckedBackupAsync()
+    {
+        var environmentFile = Path.Combine(_temporary, "backup.env");
+        await File.WriteAllTextAsync(environmentFile, "# Values are supplied by the isolated fixture environment.\n");
+        var destination = Path.Combine(_temporary, "checked-backup");
+        var start = new ProcessStartInfo("sh");
+        foreach (var argument in new[] { Path.Combine(_root, "deploy", "production", "backup.sh"), environmentFile,
+            _project, destination, Path.Combine(_temporary, "secrets") }) start.ArgumentList.Add(argument);
+        foreach (var (key, value) in _environment) start.Environment[key] = value;
+        start.Environment["STARTER_COMPOSE_OVERRIDE"] = Path.Combine(_temporary, "test-compose.yml");
+        await RunOperationAsync(start);
+        return destination;
+    }
+
+    public async Task<string> RenderRecoveryConfigurationAsync()
+    {
+        var start = new ProcessStartInfo("docker");
+        foreach (var argument in new[] { "compose", "--env-file", Path.Combine(_root, "deploy", "production", "recovery.env.example"),
+            "-f", Path.Combine(_root, "deploy", "production", "compose.yml"), "-p", "starter-recovery-check", "config", "--format", "json" })
+            start.ArgumentList.Add(argument);
+        foreach (var key in new[] { "WEB_HOST", "AUTH_HOST", "ACCOUNTS_HOST", "TRANSACTIONS_HOST", "WEB_ORIGIN", "KEYCLOAK_ORIGIN",
+            "APPLICATION_SUBNET", "APPLICATION_DYNAMIC_RANGE", "EDGE_PROXY_IP", "INTERNAL_PROXY_IP", "EDGE_BIND", "HTTPS_PORT", "HTTP_PORT",
+            "HTTPS_PUBLISHED_PORT", "HTTP_PUBLISHED_PORT", "KEYCLOAK_ADMIN_USER", "PRODUCTION_REALM_FILE" }) start.Environment.Remove(key);
+        // Mirrors the documented explicit reset, overriding any inherited live path.
+        start.Environment["DEPLOYMENT_SECRETS_DIR"] = "/srv/keycloak-starter/restored-secrets-check";
+        return await RunOperationAsync(start);
+    }
+
     public override async ValueTask DisposeAsync()
     {
         try { await base.DisposeAsync(); }
