@@ -1,5 +1,9 @@
 # ASP.NET Core + Keycloak Security Starter
 
+[![CI](https://github.com/AamiriYouness/dotnet-keycloak-starter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AamiriYouness/dotnet-keycloak-starter/actions/workflows/ci.yml)
+
+[Test coverage and local commands](#tests) · [Security test matrix](tests/Keycloak.Starter.IntegrationTests/README.md)
+
 A .NET 10 reference implementation for browser sign-in, API authorization,
 user-on-behalf-of API calls, and background service authentication with Keycloak.
 It includes Razor Pages, two minimal APIs, a worker, and tests against real
@@ -152,6 +156,7 @@ TOKEN=$(curl --fail --silent --show-error \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
 curl -i -H "Authorization: Bearer $TOKEN" http://localhost:5150/reader
 curl -i -H "Authorization: Bearer $TOKEN" http://localhost:5150/admin
+# For Swagger, copy the token before clearing it; see the walkthrough below.
 unset TOKEN
 ~~~
 
@@ -170,8 +175,23 @@ python3 scripts/smoke-test.py
 ## Swagger and token validation
 
 Open http://localhost:5150/swagger/. Its **Authorize** control accepts a raw access
-token and adds the Bearer header. Use the service-token example above to obtain a
-token locally, try `/reader` and `/admin`, then clear it with **Authorize → Logout**.
+token and adds the Bearer header.
+
+1. Run the `TOKEN=$(curl ...)` assignment from the service-token example above.
+   If you already ran the full example, repeat that assignment because its final
+   `unset TOKEN` cleared the shell variable.
+2. **Before running `unset TOKEN`**, display the token in your local terminal:
+
+   ~~~sh
+   printf '%s\n' "$TOKEN"
+   ~~~
+
+3. Copy the raw token, open **Authorize**, paste it without a `Bearer ` prefix,
+   and authorize.
+4. Run `unset TOKEN` to clear the shell variable, then try `/reader` (200) and
+   `/admin` (403) with the reader token.
+5. Use **Authorize → Logout** when finished to clear Swagger's copy of the token.
+
 Do not commit tokens or include them in shared screenshots. Swagger and the
 OpenAPI document (`/openapi/v1.json`) are available only in Development.
 
