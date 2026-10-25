@@ -46,6 +46,9 @@ public sealed class WebFixture : IAsyncLifetime
             webPort.Start();
             keycloakPort.Start();
             apiPort.Start();
+            using var transactionsPort = new TcpListener(IPAddress.Loopback, 0);
+            transactionsPort.Start();
+            _environment["TRANSACTIONS_PORT"] = ((IPEndPoint)transactionsPort.LocalEndpoint).Port.ToString();
             var web = ((IPEndPoint)webPort.LocalEndpoint).Port;
             var keycloak = ((IPEndPoint)keycloakPort.LocalEndpoint).Port;
             var api = ((IPEndPoint)apiPort.LocalEndpoint).Port;
@@ -81,6 +84,7 @@ public sealed class WebFixture : IAsyncLifetime
             webPort.Stop();
             keycloakPort.Stop();
             apiPort.Stop();
+            transactionsPort.Stop();
             _stackCreated = true;
             await ComposeAsync("up", "-d", "--build", "--wait", "--wait-timeout", "180");
         }
@@ -90,6 +94,8 @@ public sealed class WebFixture : IAsyncLifetime
             throw;
         }
     }
+
+    public Task<string> WorkerLogsAsync() => ComposeAsync("logs", "--no-color", "worker");
 
     public Task<IBrowserContext> NewContextAsync() =>
         (_browser ?? throw new InvalidOperationException("Browser not started."))

@@ -25,6 +25,11 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="../../src/Keycloak.Starter.Transactions/Keycloak.Starter.Transactions.csproj" Aliases="TransactionsApi" />
+        <ProjectReference Include="../../src/Keycloak.Starter.Worker/Keycloak.Starter.Worker.csproj" Aliases="WorkerApp" />
+        <None Include="../../keycloak/realm-export.json" Link="TestData/delegation-realm.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+    <ItemGroup>
         <None Update="TestData\*.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 

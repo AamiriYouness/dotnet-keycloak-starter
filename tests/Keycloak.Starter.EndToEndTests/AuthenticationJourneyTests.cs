@@ -58,6 +58,30 @@ public sealed class AuthenticationJourneyTests(WebFixture fixture) : IClassFixtu
     }
 
     [Fact]
+    public async Task Compose_worker_runs_its_authenticated_job()
+    {
+        var logs = "";
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            logs = await fixture.WorkerLogsAsync();
+            if (logs.Contains("Synchronization status checked successfully", StringComparison.Ordinal)) break;
+            await Task.Delay(1000, TestContext.Current.CancellationToken);
+        }
+        Assert.Contains("Synchronization status checked successfully", logs);
+        Assert.DoesNotContain("local-demo-worker-secret", logs);
+    }
+
+    [Fact]
+    public async Task Browser_user_reads_transactions_through_token_exchange()
+    {
+        await using var context = await fixture.NewContextAsync();
+        var page = await context.NewPageAsync();
+        await LoginAsync(page, "demo-reader", "local-reader-password", "/Transactions");
+        await Expect(page.Locator("body")).ToContainTextAsync("read-transactions");
+        await Expect(page.Locator("body")).ToContainTextAsync("starter-api");
+    }
+
+    [Fact]
     public async Task Authentication_survives_container_recreation()
     {
         await using var context = await fixture.NewContextAsync();
