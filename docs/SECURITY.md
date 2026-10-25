@@ -65,3 +65,14 @@ flow. Both client identity and scoped permission are checked. Token responses,
 OAuth error descriptions and authorization headers must never be added to logs.
 Configure HTTPS and external secret management before deploying; checked-in
 credentials and plain HTTP backchannels are local development examples.
+
+
+## Single-server reverse-proxy reference
+
+[PRODUCTION.md](PRODUCTION.md) describes the separate production Compose file.
+Forwarded headers are disabled by default; opting in requires exact trusted proxy
+IPs. The middleware runs before HTTPS redirection/authentication. Public Web and
+Keycloak routes are separated from the unpublished API proxy. Secrets are mounted
+per service, and Production Web startup validates explicit storage and a usable
+key-protection certificate. This is edge TLS on one trusted Docker host; the
+private proxy-to-backend hops use HTTP. It is not a multi-host TLS or HA deployment.

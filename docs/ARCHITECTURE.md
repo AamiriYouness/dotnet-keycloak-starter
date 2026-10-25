@@ -231,3 +231,12 @@ TokenExchange__Enabled=true and its settings explicitly; it is disabled by
 default outside Development to preserve API-only deployments. Changing Compose
 secret environment values alone does not rotate secrets in an imported realm:
 change them in Keycloak too. Do not deploy the local start-dev realm as-is.
+
+
+## Production reference
+
+See [PRODUCTION.md](PRODUCTION.md) for the tested single-host proxy topology.
+The shared authentication assembly also registers explicit trusted-proxy options
+for Web and both APIs. This does not change JWT validation or role normalization.
+The production issuer remains canonical HTTPS for both browsers and containers;
+the development backchannel discovery configuration is unchanged.

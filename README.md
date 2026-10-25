@@ -18,6 +18,10 @@ flowchart LR
     KC --> PostgreSQL
 ~~~
 
+For a separate single-server deployment with HTTPS proxies, production Keycloak,
+file-mounted secrets and a backup/restore runbook, see [the production reference](docs/PRODUCTION.md).
+The default Compose file below remains the development demonstration.
+
 ## Quick start: complete Docker stack
 
 Requirements: Docker with Compose v2, .NET 10 (for certificate preparation and tests), and Python 3 for smoke checks. The first run downloads and builds images. On this workstation use Docker Desktop:

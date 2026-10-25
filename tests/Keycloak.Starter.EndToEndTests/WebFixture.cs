@@ -8,17 +8,17 @@ using Microsoft.Playwright;
 
 namespace Keycloak.Starter.EndToEndTests;
 
-public sealed class WebFixture : IAsyncLifetime
+public class WebFixture : IAsyncLifetime
 {
     private readonly string _project = "starter-e2e-" + Guid.NewGuid().ToString("N")[..12];
-    private readonly string _temporary = Path.Combine(Path.GetTempPath(), "starter-e2e-" + Guid.NewGuid().ToString("N"));
-    private readonly Dictionary<string, string> _environment = new();
-    private string _root = "";
+    protected readonly string _temporary = Path.Combine(Path.GetTempPath(), "starter-e2e-" + Guid.NewGuid().ToString("N"));
+    protected readonly Dictionary<string, string> _environment = new();
+    protected string _root = "";
     private IPlaywright? _playwright;
     private IBrowser? _browser;
     private bool _stackCreated;
-    public string WebUrl { get; private set; } = "";
-    public string KeycloakUrl { get; private set; } = "";
+    public string WebUrl { get; protected set; } = "";
+    public string KeycloakUrl { get; protected set; } = "";
 
     public async ValueTask InitializeAsync()
     {
@@ -40,59 +40,72 @@ public sealed class WebFixture : IAsyncLifetime
             }
             _root = directory?.FullName ?? throw new InvalidOperationException("Solution root not found.");
             Directory.CreateDirectory(_temporary);
-            using var webPort = new TcpListener(IPAddress.Loopback, 0);
-            using var keycloakPort = new TcpListener(IPAddress.Loopback, 0);
-            using var apiPort = new TcpListener(IPAddress.Loopback, 0);
-            webPort.Start();
-            keycloakPort.Start();
-            apiPort.Start();
-            using var transactionsPort = new TcpListener(IPAddress.Loopback, 0);
-            transactionsPort.Start();
-            _environment["TRANSACTIONS_PORT"] = ((IPEndPoint)transactionsPort.LocalEndpoint).Port.ToString();
-            var web = ((IPEndPoint)webPort.LocalEndpoint).Port;
-            var keycloak = ((IPEndPoint)keycloakPort.LocalEndpoint).Port;
-            var api = ((IPEndPoint)apiPort.LocalEndpoint).Port;
-            WebUrl = $"https://localhost:{web}";
-            KeycloakUrl = $"http://localhost:{keycloak}";
-            var realm = JsonNode.Parse(await File.ReadAllTextAsync(
-                Path.Combine(AppContext.BaseDirectory, "TestData", "realm-export.json")))!;
-            var client = realm["clients"]!.AsArray().First(value => value!["clientId"]!.GetValue<string>() == "starter-web")!;
-            client["redirectUris"] = new JsonArray(WebUrl + "/signin-oidc");
-            client["attributes"]!["post.logout.redirect.uris"] = WebUrl + "/signout-callback-oidc";
-            client["attributes"]!["access.token.lifespan"] = "5";
-            var realmPath = Path.Combine(_temporary, "realm-export.json");
-            await File.WriteAllTextAsync(realmPath, realm.ToJsonString());
-            using var rsa = RSA.Create(2048);
-            var certificateRequest = new CertificateRequest("CN=localhost", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            var names = new SubjectAlternativeNameBuilder();
-            names.AddDnsName("localhost");
-            certificateRequest.CertificateExtensions.Add(names.Build());
-            using var certificate = certificateRequest.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddDays(1));
-            await File.WriteAllBytesAsync(Path.Combine(_temporary, "web.pfx"),
-                certificate.Export(X509ContentType.Pfx, "local-demo-certificate-password"));
-            _environment["WEB_PORT"] = web.ToString();
-            _environment["KEYCLOAK_PORT"] = keycloak.ToString();
-            _environment["API_PORT"] = api.ToString();
-            _environment["KEYCLOAK_REALM_FILE"] = realmPath;
-            _environment["WEB_CERT_DIRECTORY"] = _temporary;
-            _environment["WEB_CLIENT_SECRET"] = "local-demo-web-secret";
-            _environment["HTTPS_CERT_PASSWORD"] = "local-demo-certificate-password";
-            _environment["POSTGRES_ADMIN_USER"] = "postgres";
-            _environment["POSTGRES_ADMIN_PASSWORD"] = "e2e-postgres-password";
-            _environment["KEYCLOAK_DB_PASSWORD"] = "e2e-keycloak-password";
-            _environment["KC_ADMIN_PASSWORD"] = "e2e-admin-password";
-            webPort.Stop();
-            keycloakPort.Stop();
-            apiPort.Stop();
-            transactionsPort.Stop();
+            await PrepareStackAsync();
             _stackCreated = true;
             await ComposeAsync("up", "-d", "--build", "--wait", "--wait-timeout", "180");
         }
-        catch
+        catch (Exception exception)
         {
+            var logs = "";
+            if (_stackCreated)
+            {
+                try { logs = await ComposeAsync("logs", "--no-color", "--tail=20"); }
+                catch (InvalidOperationException) { }
+            }
             await DisposeAsync();
-            throw;
+            throw new InvalidOperationException("Disposable stack startup failed. Container diagnostics:\n" + logs, exception);
         }
+    }
+
+    protected virtual string[] ComposeFiles => [Path.Combine(_root, "docker-compose.yml")];
+
+    protected virtual async Task PrepareStackAsync()
+    {
+        using var webPort = new TcpListener(IPAddress.Loopback, 0);
+        using var keycloakPort = new TcpListener(IPAddress.Loopback, 0);
+        using var apiPort = new TcpListener(IPAddress.Loopback, 0);
+        webPort.Start();
+        keycloakPort.Start();
+        apiPort.Start();
+        using var transactionsPort = new TcpListener(IPAddress.Loopback, 0);
+        transactionsPort.Start();
+        _environment["TRANSACTIONS_PORT"] = ((IPEndPoint)transactionsPort.LocalEndpoint).Port.ToString();
+        var web = ((IPEndPoint)webPort.LocalEndpoint).Port;
+        var keycloak = ((IPEndPoint)keycloakPort.LocalEndpoint).Port;
+        var api = ((IPEndPoint)apiPort.LocalEndpoint).Port;
+        WebUrl = $"https://localhost:{web}";
+        KeycloakUrl = $"http://localhost:{keycloak}";
+        var realm = JsonNode.Parse(await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "TestData", "realm-export.json")))!;
+        var client = realm["clients"]!.AsArray().First(value => value!["clientId"]!.GetValue<string>() == "starter-web")!;
+        client["redirectUris"] = new JsonArray(WebUrl + "/signin-oidc");
+        client["attributes"]!["post.logout.redirect.uris"] = WebUrl + "/signout-callback-oidc";
+        client["attributes"]!["access.token.lifespan"] = "5";
+        var realmPath = Path.Combine(_temporary, "realm-export.json");
+        await File.WriteAllTextAsync(realmPath, realm.ToJsonString());
+        using var rsa = RSA.Create(2048);
+        var certificateRequest = new CertificateRequest("CN=localhost", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var names = new SubjectAlternativeNameBuilder();
+        names.AddDnsName("localhost");
+        certificateRequest.CertificateExtensions.Add(names.Build());
+        using var certificate = certificateRequest.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddDays(1));
+        await File.WriteAllBytesAsync(Path.Combine(_temporary, "web.pfx"),
+            certificate.Export(X509ContentType.Pfx, "local-demo-certificate-password"));
+        _environment["WEB_PORT"] = web.ToString();
+        _environment["KEYCLOAK_PORT"] = keycloak.ToString();
+        _environment["API_PORT"] = api.ToString();
+        _environment["KEYCLOAK_REALM_FILE"] = realmPath;
+        _environment["WEB_CERT_DIRECTORY"] = _temporary;
+        _environment["WEB_CLIENT_SECRET"] = "local-demo-web-secret";
+        _environment["HTTPS_CERT_PASSWORD"] = "local-demo-certificate-password";
+        _environment["POSTGRES_ADMIN_USER"] = "postgres";
+        _environment["POSTGRES_ADMIN_PASSWORD"] = "e2e-postgres-password";
+        _environment["KEYCLOAK_DB_PASSWORD"] = "e2e-keycloak-password";
+        _environment["KC_ADMIN_PASSWORD"] = "e2e-admin-password";
+        webPort.Stop();
+        keycloakPort.Stop();
+        apiPort.Stop();
+        transactionsPort.Stop();
     }
 
     public Task<string> WorkerLogsAsync() => ComposeAsync("logs", "--no-color", "worker");
@@ -114,7 +127,7 @@ public sealed class WebFixture : IAsyncLifetime
         return after;
     }
 
-    private async Task<string> ComposeAsync(params string[] arguments)
+    public async Task<string> ComposeAsync(params string[] arguments)
     {
         var start = new ProcessStartInfo("docker")
         {
@@ -122,7 +135,9 @@ public sealed class WebFixture : IAsyncLifetime
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        foreach (var argument in new[] { "compose", "-p", _project, "--profile", "web" }.Concat(arguments))
+        var prefix = new[] { "compose", "-p", _project }
+            .Concat(ComposeFiles.SelectMany(file => new[] { "-f", file }));
+        foreach (var argument in prefix.Concat(arguments))
         {
             start.ArgumentList.Add(argument);
         }
@@ -152,15 +167,18 @@ public sealed class WebFixture : IAsyncLifetime
         return stdout;
     }
 
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
         if (_browser is not null)
         {
             await _browser.CloseAsync();
+            _browser = null;
         }
         _playwright?.Dispose();
+        _playwright = null;
         if (_stackCreated)
         {
+            _stackCreated = false;
             await ComposeAsync("down", "--volumes", "--remove-orphans");
         }
         if (Directory.Exists(_temporary))

@@ -136,3 +136,9 @@ with Web; run the same certificate preparation first. Existing database volumes
 need an explicit realm migration or a fresh isolated project for the new clients
 and mappings. `configure-web-demo.py` updates only the original Web example; it
 does not migrate the new exchange/worker configuration. See [ARCHITECTURE.md](ARCHITECTURE.md).
+
+
+For deployment behind an HTTPS proxy, use [PRODUCTION.md](PRODUCTION.md).
+Production now requires an explicit `Authentication:StoragePath` and validates
+that the key-protection PFX has a readable private key. Its certificate is separate
+from the public TLS certificate and must survive Web recreation with the key ring.

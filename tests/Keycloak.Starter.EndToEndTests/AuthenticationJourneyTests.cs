@@ -4,7 +4,7 @@ using static Microsoft.Playwright.Assertions;
 namespace Keycloak.Starter.EndToEndTests;
 
 [Trait("Category", "Browser")]
-public sealed class AuthenticationJourneyTests(WebFixture fixture) : IClassFixture<WebFixture>
+public abstract class BrowserJourneys(WebFixture fixture)
 {
     private async Task LoginAsync(IPage page, string username, string password, string target = "/Profile")
     {
@@ -164,3 +164,6 @@ public sealed class AuthenticationJourneyTests(WebFixture fixture) : IClassFixtu
         await Expect(page.GetByRole(AriaRole.Link, new() { Name = "Open your profile" })).ToBeVisibleAsync();
     }
 }
+
+public sealed class AuthenticationJourneyTests(WebFixture fixture)
+    : BrowserJourneys(fixture), IClassFixture<WebFixture>;
