@@ -12,3 +12,4 @@
 **/*.pfx
 **/*.key
 deploy/production/secrets
+deploy/production/recovery.env

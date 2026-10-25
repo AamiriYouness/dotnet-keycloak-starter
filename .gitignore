@@ -490,3 +490,6 @@ $RECYCLE.BIN/
 # Production deployment configuration and secret material
 deploy/production/.env
 deploy/production/secrets/
+
+# Operator-specific recovery configuration
+deploy/production/recovery.env

@@ -12,8 +12,8 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     secrets: [tls-chain.pem, tls-key.pem]
     ports:
-      - "${EDGE_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:${HTTPS_PORT:-443}"
-      - "${EDGE_BIND:-0.0.0.0}:${HTTP_PORT:-80}:${HTTP_PORT:-80}"
+      - "${EDGE_BIND:-0.0.0.0}:${HTTPS_PUBLISHED_PORT:-${HTTPS_PORT:-443}}:${HTTPS_PORT:-443}"
+      - "${EDGE_BIND:-0.0.0.0}:${HTTP_PUBLISHED_PORT:-${HTTP_PORT:-80}}:${HTTP_PORT:-80}"
     networks:
       application:
         ipv4_address: ${EDGE_PROXY_IP:-172.30.50.2}
