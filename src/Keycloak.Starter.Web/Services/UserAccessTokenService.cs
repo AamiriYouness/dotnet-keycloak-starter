@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Keycloak.Starter.Web.Configuration;
 using Keycloak.Starter.Web.Security;
@@ -74,18 +75,26 @@ public sealed class UserAccessTokenService(
             }
             response.EnsureSuccessStatusCode();
 
-            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-            var root = document.RootElement;
-            var tokens = ticket.Properties.GetTokens().ToDictionary(token => token.Name, token => token.Value);
-            tokens["access_token"] = root.GetProperty("access_token").GetString()!;
-            foreach (var name in new[] { "refresh_token", "id_token", "token_type" })
+            RefreshTokenResponse? refreshed;
+            try
             {
-                if (root.TryGetProperty(name, out var value))
-                {
-                    tokens[name] = value.GetString()!;
-                }
+                refreshed = await response.Content.ReadFromJsonAsync<RefreshTokenResponse>(cancellationToken);
             }
-            tokens["expires_at"] = DateTimeOffset.UtcNow.AddSeconds(root.GetProperty("expires_in").GetInt32())
+            catch (JsonException)
+            {
+                // Keep provider content and token values out of exceptions and logs.
+                throw new HttpRequestException("The authorization server returned an invalid refresh response.");
+            }
+            if (refreshed is null || string.IsNullOrWhiteSpace(refreshed.AccessToken) ||
+                refreshed.TokenType != "Bearer" || refreshed.ExpiresIn <= 0)
+                throw new HttpRequestException("The authorization server returned an invalid refresh response.");
+
+            var tokens = ticket.Properties.GetTokens().ToDictionary(token => token.Name, token => token.Value);
+            tokens["access_token"] = refreshed.AccessToken;
+            tokens["token_type"] = refreshed.TokenType;
+            if (refreshed.RefreshToken is { Length: > 0 }) tokens["refresh_token"] = refreshed.RefreshToken;
+            if (refreshed.IdToken is { Length: > 0 }) tokens["id_token"] = refreshed.IdToken;
+            tokens["expires_at"] = DateTimeOffset.UtcNow.AddSeconds(refreshed.ExpiresIn)
                 .ToString("O", CultureInfo.InvariantCulture);
             ticket.Properties.StoreTokens(tokens.Select(pair => new AuthenticationToken
             {
