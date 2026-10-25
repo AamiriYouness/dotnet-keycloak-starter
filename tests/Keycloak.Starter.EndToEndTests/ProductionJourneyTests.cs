@@ -147,6 +147,16 @@ public sealed class ProductionJourneyTests(ProductionWebFixture fixture)
     }
 
     [Fact]
+    public async Task Keycloak_database_owner_has_only_the_required_role_attributes()
+    {
+        var attributes = await fixture.ComposeAsync("exec", "-T", "postgres", "psql", "--no-psqlrc", "--no-password",
+            "--set=ON_ERROR_STOP=1", "--username", "postgres", "--dbname", "postgres", "-Atc",
+            "SELECT r.rolcanlogin, r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolinherit, r.rolreplication, r.rolbypassrls, " +
+            "d.datdba = r.oid FROM pg_roles r JOIN pg_database d ON d.datname = 'keycloak' WHERE r.rolname = 'keycloak'");
+        Assert.Equal("t|f|f|f|f|f|f|t", attributes.Trim());
+    }
+
+    [Fact]
     public async Task Postgres_backup_can_be_restored_into_an_isolated_database()
     {
         var result = await fixture.ComposeAsync("exec", "-T", "postgres", "sh", "-ec",
