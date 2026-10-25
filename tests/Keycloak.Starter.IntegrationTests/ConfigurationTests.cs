@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -23,7 +24,7 @@ public sealed class ConfigurationTests
                 builder.UseSetting(key, value);
             });
 
-        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+        var exception = Assert.Throws<OptionsValidationException>(() => factory.CreateClient());
 
         Assert.Contains(expectedMessage, exception.Message);
     }

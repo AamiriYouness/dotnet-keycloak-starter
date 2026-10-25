@@ -19,4 +19,7 @@
       </Content>
     </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../Keycloak.Starter.Authentication/Keycloak.Starter.Authentication.csproj" />
+  </ItemGroup>
 </Project>
