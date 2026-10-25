@@ -126,3 +126,13 @@ For the fast API tests without browser/container fixtures, use:
 ~~~sh
 dotnet test --project tests/Keycloak.Starter.IntegrationTests/Keycloak.Starter.IntegrationTests.csproj --filter-not-trait Category=Containers
 ~~~
+
+## Delegated Transactions page
+
+The authenticated `/Transactions` page calls API A `/accounts/transactions`.
+Sign in as `demo-reader` to exercise standard V2 exchange and the separate
+Transactions API. The default Compose stack now starts both APIs and the worker
+with Web; run the same certificate preparation first. Existing database volumes
+need an explicit realm migration or a fresh isolated project for the new clients
+and mappings. `configure-web-demo.py` updates only the original Web example; it
+does not migrate the new exchange/worker configuration. See [ARCHITECTURE.md](ARCHITECTURE.md).

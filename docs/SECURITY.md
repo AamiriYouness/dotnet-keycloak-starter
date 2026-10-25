@@ -4,9 +4,9 @@
 
 Keycloak is the trusted token issuer. The API accepts access tokens only after JWT signature, issuer, audience, and lifetime validation. It obtains discovery information and signing keys from the configured Keycloak endpoint. Possessing a syntactically valid JWT, or decoding its payload, is insufficient to authenticate.
 
-The expected audience is `starter-api`. Role extraction occurs in `OnTokenValidated`, after the token has passed validation. Only roles under `resource_access.starter-api.roles` become API role claims. The client ID in this path must continue to match the intended API if the audience is renamed.
+The expected audience is `starter-api`. Role extraction occurs in the DI-registered `KeycloakJwtBearerEvents.TokenValidated` handler, after the token has passed validation. Both APIs share this handler; each uses its own audience. For API A, only roles under `resource_access.starter-api.roles` become API role claims. `RoleClaimType` selects an application-owned claim type rebuilt from those resource roles; incoming generic or application-role claims cannot bypass that mapping. The client ID in this path must continue to match the intended API if the audience is renamed.
 
-The caller's `sub` identifies a Keycloak service account in the supplied demonstrations. A client credentials token does not represent a human login.
+In Client Credentials demonstrations, `sub` identifies a Keycloak service account; Web and exchange demonstrations preserve a human user's `sub`. A client credentials token does not represent a human login.
 
 ## Authentication and authorization
 
@@ -28,7 +28,7 @@ Compose uses Keycloak `start-dev`, plain HTTP, a bootstrap admin account, and pu
 
 Keycloak uses a dedicated PostgreSQL role that owns the Keycloak database and has no superuser privileges. PostgreSQL is not published on a host port. The initialization script uses psql's quoted variable interpolation, so password punctuation is handled safely.
 
-The API runtime image uses .NET's non-root application user. It needs no Keycloak client secret.
+The API runtime image uses .NET's non-root application user. JWT validation needs no client secret. API A uses a separate configured client credential for token exchange.
 
 The Keycloak image is pinned to 26.8.1 and PostgreSQL to 17.11 in both Compose and integration tests. Keycloak 26.8.1 contains security fixes newer than the original 26.2.5 baseline; see [the official release notes](https://www.keycloak.org/2026/10/keycloak-2681-released). Keep patch versions under review and rerun the integration suite after changing them.
 
@@ -49,3 +49,19 @@ The Keycloak image is pinned to 26.8.1 and PostgreSQL to 17.11 in both Compose a
 The container suite tests actual Keycloak-issued tokens against the API, including wrong audiences, foreign realms, expiration, tampering, malformed JWTs, and role isolation. The smoke script verifies that a newly imported development realm can exercise the full 200/401/403 flow.
 
 The root CI workflow runs both checks on fresh infrastructure. See [the integration test guide](../tests/Keycloak.Starter.IntegrationTests/README.md).
+
+
+## API-to-API exchange and worker boundaries
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the exact Keycloak 26.8.1 standard V2
+configuration and permissions. The original user token targets API A only. A
+authenticates itself to exchange it for a B-only access token, and B independently
+checks audience, authorized party and its read role. Only A is enabled to request
+exchange; scope mappings and user role assignments constrain the target. No
+legacy exchange feature or legacy admin exchange permission is enabled.
+
+The worker's client has only the A sync role, no exchange permission or browser
+flow. Both client identity and scoped permission are checked. Token responses,
+OAuth error descriptions and authorization headers must never be added to logs.
+Configure HTTPS and external secret management before deploying; checked-in
+credentials and plain HTTP backchannels are local development examples.

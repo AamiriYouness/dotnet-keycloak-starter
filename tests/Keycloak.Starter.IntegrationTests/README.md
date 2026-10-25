@@ -3,12 +3,12 @@
 Run from the repository root with .NET 10 and Docker Desktop (or another compatible Docker engine) running:
 
 ```sh
-dotnet test Keycloak.Starter.sln
+dotnet test --project tests/Keycloak.Starter.IntegrationTests
 ```
 
 Testcontainers starts Keycloak 26.8.1 and PostgreSQL 17.11 on a private Docker network, assigns random host ports, imports the test realms, and removes the containers and network afterward. The first run downloads the images. Docker Compose and the manually configured development realm are not required.
 
-The realm JSON under `TestData` contains disposable test clients and credentials. It is not a development or production realm export. Tokens are requested through the client credentials flow; these tests represent service accounts rather than interactive user login.
+The realm JSON under `TestData` contains disposable test clients and credentials. It is not a development or production realm export. The original fixture requests service-account tokens through Client Credentials. The separate DelegationFixture derives its realm from the checked-in demo import, enabling a test-only password grant on starter-web to create real user sessions without browser automation. Production password grants remain disabled. The browser suite independently exercises authorization code + PKCE through the full Compose stack.
 
 | Case | Expected result |
 | --- | --- |
@@ -33,3 +33,41 @@ Run only the fast tests that do not require Docker:
 ```sh
 dotnet test --project tests/Keycloak.Starter.IntegrationTests/Keycloak.Starter.IntegrationTests.csproj --filter-not-trait Category=Containers
 ```
+
+
+The delegation/worker security matrix also covers:
+
+| Case | Expected result |
+| --- | --- |
+| Web user token on A `/me` | 200 |
+| Original A-only user token on B | 401 |
+| A exchanges user token and calls B | 200; subject preserved; B-only audience |
+| Exchange by Web/worker, wrong secret, or unauthorized target | OAuth error |
+| Unprivileged user on delegation endpoint | 403 |
+| Worker Client Credentials on sync | 200 |
+| Worker on reader/admin/user-delegated endpoint | 403 |
+| User on worker endpoint | 403 |
+| 20 concurrent service token requests | One token POST |
+| Token renewal threshold | Reuses token before threshold; renews afterward |
+| Invalid/malformed OAuth responses | Safe exception without provider content |
+| Cancellation during discovery, token POST, gate wait or API call | Operation canceled |
+
+The new fixture uses disposable Keycloak development storage; the original fixture
+also validates the PostgreSQL-backed setup. No manually configured server is used.
+On this workstation select Docker Desktop for both clients:
+
+```sh
+export DOCKER_CONTEXT=desktop-linux
+export DOCKER_HOST=unix://$HOME/.docker/run/docker.sock
+dotnet test
+```
+
+The complete solution additionally requires Playwright Chromium, as documented
+in [the Web guide](../../docs/WEB.md).
+
+
+`KeycloakRoleMappingTests` covers the shared post-validation handler: each API
+receives only its resource roles; malformed/missing roles grant nothing; realm,
+foreign and incoming application-role claims cannot bypass mapping; repeated
+mapping does not duplicate roles. The container tests exercise this handler
+through real JWT validation and the APIs' `RequireRole` policies.
