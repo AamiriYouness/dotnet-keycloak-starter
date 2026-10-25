@@ -9,6 +9,11 @@ user-on-behalf-of API calls, and background service authentication with Keycloak
 It includes Razor Pages, two minimal APIs, a worker, and tests against real
 Keycloak and PostgreSQL containers.
 
+![Keycloak demo walkthrough showing browser login, role-based access, token exchange and worker authentication](docs/media/keycloak-demo.gif)
+
+A 35-second walkthrough assembled from real browser captures. The final panel
+quotes a successful authentication check from the running worker's log.
+
 | Scenario | Flow | Demonstrated boundary |
 | --- | --- | --- |
 | Browser sign-in | Authorization code + PKCE | Secure cookie; tokens stored server-side; API role policies |
@@ -104,6 +109,13 @@ The development realm includes these browser accounts:
 Transactions are fixed sample data. This example demonstrates audience and role
 authorization, not per-record ownership. The `admin` role does not imply `reader`
 or Transactions access. All three browser accounts can access Profile.
+
+| Reader accessing Admin: HTTP 403 | Reader accessing Transactions: HTTP 200 |
+| --- | --- |
+| ![Signed-in reader denied access to the Admin endpoint](docs/media/reader-admin-denied.jpg) | ![Transactions response with the user's subject and starter-api as the authorized party](docs/media/transactions-exchange.jpg) |
+
+The same reader is denied Admin access but can retrieve sample Transactions
+through Accounts' token exchange. These screenshots use disposable demo accounts.
 
 The browser user has `azp=starter-web`; the exchanged token retains that user's
 `sub` and has `azp=starter-api`. The worker has `azp=starter-worker` and a separate
