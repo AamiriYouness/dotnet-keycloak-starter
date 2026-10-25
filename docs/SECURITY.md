@@ -30,7 +30,7 @@ Keycloak uses a dedicated PostgreSQL role that owns the Keycloak database and ha
 
 The API runtime image uses .NET's non-root application user. JWT validation needs no client secret. API A uses a separate configured client credential for token exchange.
 
-The Keycloak image is pinned to 26.8.1 and PostgreSQL to 17.11 in both Compose and integration tests. Keycloak 26.8.1 contains security fixes newer than the original 26.2.5 baseline; see [the official release notes](https://www.keycloak.org/2026/10/keycloak-2681-released). Keep patch versions under review and rerun the integration suite after changing them.
+The Keycloak image is pinned to 26.8.1 and PostgreSQL to 17.11 in both Compose and integration tests. See [the official release notes](https://www.keycloak.org/2026/10/keycloak-2681-released). Keep patch versions under review and rerun the integration suite after changing them.
 
 ## Before deploying
 

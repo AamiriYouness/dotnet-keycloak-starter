@@ -8,7 +8,7 @@ dotnet test --project tests/Keycloak.Starter.IntegrationTests
 
 Testcontainers starts Keycloak 26.8.1 and PostgreSQL 17.11 on a private Docker network, assigns random host ports, imports the test realms, and removes the containers and network afterward. The first run downloads the images. Docker Compose and the manually configured development realm are not required.
 
-The realm JSON under `TestData` contains disposable test clients and credentials. It is not a development or production realm export. The original fixture requests service-account tokens through Client Credentials. The separate DelegationFixture derives its realm from the checked-in demo import, enabling a test-only password grant on starter-web to create real user sessions without browser automation. Production password grants remain disabled. The browser suite independently exercises authorization code + PKCE through the full Compose stack.
+The realm JSON under `TestData` contains disposable test clients and credentials. It is not a development or production realm export. The service-account fixture requests service-account tokens through Client Credentials. The separate DelegationFixture derives its realm from the checked-in demo import, enabling a test-only password grant on starter-web to create real user sessions without browser automation. Production password grants remain disabled. The browser suite independently exercises authorization code + PKCE through the full Compose stack.
 
 | Case | Expected result |
 | --- | --- |
@@ -52,7 +52,7 @@ The delegation/worker security matrix also covers:
 | Invalid/malformed OAuth responses | Safe exception without provider content |
 | Cancellation during discovery, token POST, gate wait or API call | Operation canceled |
 
-The new fixture uses disposable Keycloak development storage; the original fixture
+The new fixture uses disposable Keycloak development storage; the service-account fixture
 also validates the PostgreSQL-backed setup. No manually configured server is used.
 On this workstation select Docker Desktop for both clients:
 

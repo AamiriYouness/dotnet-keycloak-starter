@@ -103,7 +103,7 @@ Compose starts the optimized Keycloak image with `start --optimized`, production
 .NET environments, service-specific mounted JSON secrets, persistent PostgreSQL
 and Web authentication volumes. The realm template imports only the application
 clients, roles and worker service account. It has **no demo users, shared demo
-passwords, historical curl clients, or public sample client secrets**.
+passwords, curl/smoke demonstration clients, or public sample client secrets**.
 
 The template uses Keycloak environment placeholders populated from the mounted
 secret files. Runtime .NET settings read `/run/secrets/appsettings.json` after

@@ -1,12 +1,10 @@
 # User exchange and service authentication
 
-The starter uses .NET 10, minimal APIs, and Keycloak **26.8.1**. The existing
-`Keycloak.Starter.Api` remains API A (Accounts); its original endpoints and role
-policies remain available. `Keycloak.Starter.Transactions` is API B.
+The starter uses .NET 10, minimal APIs, and Keycloak **26.8.1**. `Keycloak.Starter.Api` is API A (Accounts), with authenticated profile, reader,
+admin, synchronization and delegated Transactions endpoints. `Keycloak.Starter.Transactions` is API B.
 `Keycloak.Starter.Worker` runs independently of browser sessions. There is no CLI
-package in this implementation. The historical `starter-cli` realm client is
-retained solely for compatibility with the original curl/smoke demonstrations;
-it does not represent the new worker or a packaged CLI.
+package in this implementation. `starter-cli` is the reader service account for curl/smoke demonstrations;
+it is separate from the worker and does not represent a packaged CLI.
 
 ```mermaid
 sequenceDiagram
@@ -99,7 +97,7 @@ fixed sample, not a real account database or an ownership authorization example.
 
 The worker has no user context. Its own `sync` role and `azp=starter-worker` are
 both required by `/sync/status`. It cannot call the user-delegated endpoint,
-reader/admin endpoints, or B. `/me` remains the original generic authenticated
+reader/admin endpoints, or B. `/me` is the generic authenticated
 principal endpoint and accepts either identity type.
 
 ## Role normalization and Microsoft authentication patterns

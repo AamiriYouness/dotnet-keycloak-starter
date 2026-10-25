@@ -1,110 +1,147 @@
-# Keycloak + ASP.NET Core Security Starter
+# ASP.NET Core + Keycloak Security Starter
 
-A portfolio starter demonstrating JWT authentication, API-specific client roles, authorization policies, and integration tests against real Keycloak and PostgreSQL containers.
+A .NET 10 reference implementation for browser sign-in, API authorization,
+user-on-behalf-of API calls, and background service authentication with Keycloak.
+It includes Razor Pages, two minimal APIs, a worker, and tests against real
+Keycloak and PostgreSQL containers.
 
-The existing API is API A (Accounts). A second Transactions API demonstrates audience-restricted user access through RFC 8693 token exchange. An independent .NET background worker uses Client Credentials for a synchronization check. Both APIs are stateless; PostgreSQL stores Keycloak's configuration and identities.
-The Razor Pages web application also supports browser login through authorization code with PKCE, server-side token storage, and sessions that survive container recreation. See [the web setup and Playwright guide](docs/WEB.md) for the complete browser demo.
-The web guide includes Bash and PowerShell setup, explains the cross-platform PFX certificate format, and shows how the host preparation step differs from Docker image build and container initialization.
+| Scenario | Flow | Demonstrated boundary |
+| --- | --- | --- |
+| Browser sign-in | Authorization code + PKCE | Secure cookie; tokens stored server-side; API role policies |
+| Accounts → Transactions | RFC 8693 standard token exchange | Same user subject; token restricted to the Transactions audience |
+| Background synchronization | Client Credentials | Independent service account with only the synchronization permission |
 
 ~~~mermaid
 flowchart LR
     Browser -->|Secure session cookie| Web[Razor Pages]
-    Web -->|User token: aud starter-api| A[API A / Accounts]
-    A -->|RFC 8693 exchange| KC[Keycloak 26.8.1]
-    KC -->|Token: aud starter-transactions| A
-    A -->|Exchanged user token| B[API B / Transactions]
+    Web -->|User token: Accounts audience| A[Accounts API]
+    A -->|Authenticated token exchange| KC[Keycloak]
+    KC -->|Transactions token: same user| A
+    A -->|Exchanged bearer token| B[Transactions API]
     Worker -->|Client Credentials| KC
-    Worker -->|Service token: sync role| A
-    KC --> PostgreSQL
+    Worker -->|Service token: sync permission| A
+    KC --> DB[(PostgreSQL)]
 ~~~
 
-For a separate single-server deployment with HTTPS proxies, production Keycloak,
-file-mounted secrets and a backup/restore runbook, see [the production reference](docs/PRODUCTION.md).
-The default Compose file below remains the development demonstration.
+Start with the local walkthrough below. The [architecture guide](docs/ARCHITECTURE.md)
+explains token lifecycles and trust boundaries; the [production reference](docs/PRODUCTION.md)
+covers a separate single-server HTTPS deployment with proxies, mounted secrets,
+and checked backup/recovery procedures.
 
-## Quick start: complete Docker stack
+## Quick start
 
-Requirements: Docker with Compose v2, .NET 10 (for certificate preparation and tests), and Python 3 for smoke checks. The first run downloads and builds images. On this workstation use Docker Desktop:
+Requirements: a .NET 10 SDK and Docker with Compose v2. Windows users should use
+Docker Desktop's Linux containers. Python 3 is optional for the smoke script.
+Run commands from the repository root, using a fresh project/database to import
+the supplied development realm. The default ports must be free; use the
+[alternate workstation section](#alternate-workstation-setup-and-existing-realms)
+when retaining another local stack.
 
-~~~sh
-export DOCKER_CONTEXT=desktop-linux
-export DOCKER_HOST=unix://$HOME/.docker/run/docker.sock
-~~~
-
-These exports apply to Docker CLI/Compose and Testcontainers respectively. Other platforms can use their normal Docker engine configuration. Use a fresh Compose project/database to import the new realm; existing realms are not overwritten.
+**macOS / Linux:**
 
 ~~~sh
 bash scripts/prepare-web.sh
 docker compose up --build -d --wait --wait-timeout 180
-python3 scripts/smoke-test.py
 ~~~
 
-The smoke script checks the original API endpoints with anonymous, reader, admin, and unprivileged callers. It prints HTTP statuses without printing tokens or secrets.
+**Windows PowerShell:**
 
-| Service | Address |
+~~~powershell
+.\scripts\prepare-web.ps1
+docker compose up --build -d --wait --wait-timeout 180
+~~~
+
+If the browser needs certificate trust, run `dotnet dev-certs https --trust` on
+your development machine. Both preparation helpers export the same PFX format.
+See [WEB.md](docs/WEB.md) for certificate details and host-run instructions.
+
+| Service | Default address |
 | --- | --- |
 | Web | https://localhost:7002 |
-| API A / Accounts | http://localhost:5150 |
-| API B / Transactions | http://localhost:5160 |
+| Accounts API (API A) | http://localhost:5150 |
+| Transactions API (API B) | http://localhost:5160 |
 | Keycloak Admin Console | http://localhost:8080/admin/ |
-| Development Swagger UI | http://localhost:5150/swagger/ |
-| Development OpenAPI document | http://localhost:5150/openapi/v1.json |
+| Accounts Swagger UI | http://localhost:5150/swagger/ |
 
-The default local admin login is `admin` / `local-admin-password`. All supplied passwords and client secrets are public development examples. Override local server credentials by copying `.env.example` to `.env` before the first startup. Keep real secrets out of source control.
+The local Keycloak administrator is `admin` / `local-admin-password`.
+All supplied passwords and client secrets are public development examples.
+Copy `.env.example` to `.env` before startup if you need overrides; keep real
+credentials out of source control. The default Compose file is for development.
 
-### Existing development data from an earlier checkout
+## Browser and worker walkthrough
 
-Startup import skips realms that already exist. Updating `realm-export.json` does not modify the realm in an existing PostgreSQL volume. The Keycloak image has also been updated; back up an existing database before upgrading it.
+The development realm includes these browser accounts:
 
-To try the finished demo alongside an existing setup, use a separate project and ports:
+| Username | Password | Reader | Admin | Transactions |
+| --- | --- | --- | --- | --- |
+| `demo-reader` | `local-reader-password` | 200 | 403 | 200 |
+| `demo-admin` | `local-admin-user-password` | 403 | 200 | 403 |
+| `demo-unprivileged` | `local-user-password` | 403 | 403 | 403 |
 
-~~~sh
-KEYCLOAK_PORT=8082 API_PORT=5152 TRANSACTIONS_PORT=5162 docker compose -p starter-delegation up postgres keycloak api transactions worker --build -d --wait --wait-timeout 180
-KEYCLOAK_URL=http://localhost:8082 API_URL=http://localhost:5152 python3 scripts/smoke-test.py
-~~~
+1. Open https://localhost:7002 and sign in as `demo-reader`.
+2. Open **Profile** to see the subject returned by Accounts, then **Reader** to
+   exercise its role policy.
+3. Open **Sample transactions**. Web calls Accounts `/accounts/transactions`;
+   Accounts exchanges the user token and calls Transactions. Expect HTTP 200:
 
-### Run the API on your host
+   ~~~json
+   {"sub":"<user-id>","authorizedParty":"starter-api","operation":"read-transactions","transactions":[{"id":"demo-001","amount":42.50,"currency":"MAD"}]}
+   ~~~
 
-Install a stable .NET 10 SDK, then start the dependencies and the API:
+4. Sign out, then sign in as `demo-unprivileged` to see protected pages return 403.
+5. Observe the independent worker:
 
-~~~sh
-docker compose up postgres keycloak -d --wait --wait-timeout 180
-dotnet run --project src/Keycloak.Starter.Api --launch-profile http
-~~~
+   ~~~sh
+   docker compose logs --tail=30 worker
+   ~~~
 
-This starts the API at http://localhost:5150. The HTTP launch profile is for local development. For a custom Keycloak port, set `Keycloak__Authority` to the matching realm URL when starting the API.
+   A successful job logs `Synchronization status checked successfully (HTTP 200)`.
+
+Transactions are fixed sample data. This example demonstrates audience and role
+authorization, not per-record ownership. The `admin` role does not imply `reader`
+or Transactions access. All three browser accounts can access Profile.
+
+The browser user has `azp=starter-web`; the exchanged token retains that user's
+`sub` and has `azp=starter-api`. The worker has `azp=starter-worker` and a separate
+service-account subject. Standard Keycloak V2 exchange has RFC 8693 impersonation
+semantics without an `act` actor chain; it is not consent-based actor delegation.
 
 ## Endpoints and permissions
 
-| Endpoint | Required permission | Expected response |
+| Endpoint | Required permission | Result |
 | --- | --- | --- |
-| `GET /health` | Public | 200, `Ok!` |
-| `GET /me` | Any valid API access token | 200 with the token's `sub` |
-| `GET /reader` | `starter-api` client role `reader` | 200, otherwise 403 |
-| `GET /accounts/transactions` | Web user with A `reader`; exchange also requires user B `read-transactions` | 200 with B response |
-| `GET /sync/status` | `starter-worker` client + A `sync` role | 200; users receive 403 |
-| API B: `GET /transactions` | B audience + `starter-api` authorized party + B `read-transactions` | 200; A-only token receives 401 |
-| `GET /admin` | `starter-api` client role `admin` | 200, otherwise 403 |
+| Accounts `GET /health` | Public | 200 |
+| Accounts `GET /me` | Any valid Accounts access token | 200 with `sub` |
+| Accounts `GET /reader` | `starter-api` role `reader` | 200, otherwise 403 |
+| Accounts `GET /admin` | `starter-api` role `admin` | 200, otherwise 403 |
+| Accounts `GET /accounts/transactions` | Approved Web user with `reader`; exchange requires the user's Transactions permission | 200 with the Transactions response |
+| Accounts `GET /sync/status` | `starter-worker` client and `sync` role | 200; browser users receive 403 |
+| Transactions `GET /transactions` | Transactions audience, `starter-api` authorized party, `read-transactions` role | 200; Accounts-only tokens receive 401 |
 
-A missing or invalid token produces **401** with a Bearer challenge. A valid token without the endpoint's required role produces **403**. The `admin` role is independent of `reader`; assign both when a caller needs both permissions.
+Missing or invalid tokens receive **401** with a Bearer challenge. A valid token
+without the required permission receives **403**. Accounts exchanges the user
+token for a Transactions token; it never forwards the incoming token to that API.
 
-## Reproducible demo identities
+## Keycloak clients and service-account requests
 
-The development realm is defined in [keycloak/realm-export.json](keycloak/realm-export.json). A fresh database imports:
+[keycloak/realm-export.json](keycloak/realm-export.json) defines the development realm.
 
-| Client ID | Purpose / role | Local demo secret |
+| Client ID | Purpose | Local demo secret |
 | --- | --- | --- |
-| `starter-api` | API A resource and confidential exchange requester | `local-demo-exchange-secret` (exchange only) |
-| `starter-transactions` | API B resource, `read-transactions` | None |
-| `starter-web` | Browser users, authorization code + PKCE | `local-demo-web-secret` |
-| `starter-worker` | Service account, A `sync` only | `local-demo-worker-secret` |
-| `starter-cli` | Historical curl/smoke reader account; not a CLI package | `local-demo-reader-secret` |
-| `starter-admin` | Service account with `admin` | `local-demo-admin-secret` |
-| `starter-no-role` | Authenticated caller with no API role | `local-demo-none-secret` |
+| `starter-web` | Confidential browser client, authorization code + PKCE | `local-demo-web-secret` |
+| `starter-api` | Accounts resource and confidential exchange requester | `local-demo-exchange-secret` |
+| `starter-transactions` | Transactions resource and read permission | None |
+| `starter-worker` | Service account with Accounts `sync` only | `local-demo-worker-secret` |
+| `starter-cli` | Curl/smoke service account with Accounts `reader` | `local-demo-reader-secret` |
+| `starter-admin` | Curl/smoke service account with Accounts `admin` | `local-demo-admin-secret` |
+| `starter-no-role` | Curl/smoke service account without API roles | `local-demo-none-secret` |
 
-Password grants are disabled on every imported client. Interactive login is enabled only for `starter-web`. Role scope mappings restrict each client to its assigned API roles, and an audience mapper adds `starter-api` to access tokens.
+`starter-cli` is an OAuth client used by curl and smoke checks; this repository
+does not ship a packaged CLI. Password grants are disabled on every imported
+client. Only `starter-web` supports interactive login. Scope mappings constrain
+each client's API roles; only `starter-api` can request standard token exchange.
 
-To request a reader token manually, use Bash or zsh:
+Request a reader service token from Bash or zsh (requires curl and Python 3):
 
 ~~~sh
 TOKEN=$(curl --fail --silent --show-error \
@@ -113,169 +150,190 @@ TOKEN=$(curl --fail --silent --show-error \
   --data-urlencode client_id=starter-cli \
   --data-urlencode client_secret=local-demo-reader-secret \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
-
 curl -i -H "Authorization: Bearer $TOKEN" http://localhost:5150/reader
 curl -i -H "Authorization: Bearer $TOKEN" http://localhost:5150/admin
 unset TOKEN
 ~~~
 
-The first API request returns 200; the second returns 403.
+Expect 200 then 403. For the worker boundary, substitute client `starter-worker`
+and secret `local-demo-worker-secret`, then call `/sync/status` (200) and
+`/accounts/transactions` (403). The running worker caches its token until shortly
+before expiry and requests a new Client Credentials token for renewal.
 
-## Try authenticated requests in Swagger UI
+Optional smoke checks exercise anonymous, reader, admin and unprivileged requests
+without printing credentials:
 
-Open http://localhost:5150/swagger/ (or http://localhost:5152/swagger/ for the separately named demo).
+~~~sh
+python3 scripts/smoke-test.py
+~~~
 
-1. Request an access token using the assignment to `TOKEN` above. Before clearing it, run `printf '%s\n' "$TOKEN"` locally and copy the token.
-2. Click **Authorize**, paste the raw access token without a `Bearer ` prefix, and authorize. Swagger UI adds the header automatically.
-3. Expand `/reader`, select **Try it out**, and **Execute**. A reader token returns 200.
-4. Try `/admin` with the same token to see the expected 403. Use a token from `starter-admin` for a successful admin request.
-5. Use **Authorize → Logout** to clear the token when finished.
+## Swagger and token validation
 
-The UI and document are available only in Development. Protected operations declare the Bearer requirement and their authentication/authorization failure responses; `/health` remains public. The UI accepts access tokens and requires no client secret.
+Open http://localhost:5150/swagger/. Its **Authorize** control accepts a raw access
+token and adds the Bearer header. Use the service-token example above to obtain a
+token locally, try `/reader` and `/admin`, then clear it with **Authorize → Logout**.
+Do not commit tokens or include them in shared screenshots. Swagger and the
+OpenAPI document (`/openapi/v1.json`) are available only in Development.
 
-## How token validation works
+Each API independently validates signature, issuer, audience and lifetime. The
+shared `KeycloakJwtBearerEvents` handler maps only the current API's
+`resource_access.<audience>.roles` into application-owned role claims. Policies
+use `RequireRole`; realm roles, foreign-client roles and incoming application-role
+claims cannot bypass that mapping. Malformed role data grants no permissions.
 
-ASP.NET Core validates the access token's signature, issuer, audience, and lifetime using Keycloak discovery and its published signing keys. Neither API needs a client secret to validate JWTs. API A separately uses its client secret to authenticate token-exchange requests.
+In development Compose, the browser uses `http://localhost:8080` while containers
+retrieve metadata through `http://keycloak:8080`. Keycloak retains the canonical
+issuer and advertises reachable backchannel endpoints. Issuer validation stays
+enabled. The production reference uses canonical HTTPS URLs throughout.
 
-After validation, the shared `KeycloakJwtBearerEvents` handler maps only each API's own `resource_access.<audience>.roles` into application-owned .NET role claims. Both APIs use `RequireRole` policies; `RoleClaimType` selects those mapped claims. Realm roles and roles belonging to other clients grant no API permission. Named policies `CanRead` and `CanAdmin` enforce the corresponding roles. Missing or malformed role data grants no roles.
+## Run applications on the host
 
-The Docker API uses `Keycloak__MetadataAddress` to reach discovery over the internal Compose network. Keycloak advertises the canonical public issuer while resolving backchannel endpoints internally, so a token requested from localhost can be verified by the API container. Issuer validation remains enabled.
+The same default addresses apply to Compose and host development: Keycloak 8080,
+Accounts 5150, Transactions 5160, Web HTTPS 7002. Follow the complete
+[host-run walkthrough](docs/WEB.md#run-web-on-the-host), including the User Secrets
+command and explicit host-reachable authority, metadata and API settings.
+
+To run Accounts or Transactions on the host, start only their dependencies and
+use separate terminals:
+
+~~~sh
+docker compose up -d --wait --wait-timeout 180 postgres keycloak
+# Terminal 1
+Keycloak__Authority=http://localhost:8080/realms/starter \
+TokenExchange__TransactionsUrl=http://localhost:5160 \
+dotnet run --project src/Keycloak.Starter.Api --launch-profile http
+# Terminal 2
+Keycloak__Authority=http://localhost:8080/realms/starter \
+dotnet run --project src/Keycloak.Starter.Transactions --launch-profile http
+# Terminal 3 (optional worker)
+DOTNET_ENVIRONMENT=Development \
+Worker__Authority=http://localhost:8080/realms/starter \
+Worker__ApiUrl=http://localhost:5150 \
+dotnet run --project src/Keycloak.Starter.Worker
+~~~
+
+Do not start a container and host process on the same published application port.
 
 ## Tests
 
-Requirements: .NET 10, a running Docker engine, and Playwright Chromium for the browser suite. Follow the one-time browser installation instructions in [the web guide](docs/WEB.md) before running the full solution. The API integration project can also be run independently.
+Requirements: .NET 10, Docker, and Playwright Chromium for browser tests. Follow
+[the browser installation steps](docs/WEB.md#browser-tests) on first use.
 
 ~~~sh
 dotnet test
 ~~~
 
-Testcontainers starts disposable Keycloak and PostgreSQL instances, imports isolated test realms, and cleans up afterward. The suite tests anonymous access, role checks, invalid/expired tokens, foreign-role isolation, real token exchange, audience rejection, unauthorized requesters and targets, worker permissions, cache concurrency/renewal, safe OAuth errors and cancellation. Browser tests build a fresh complete Compose stack and verify both the Web-to-A-to-B call and the worker's authenticated job. API exchange tests enable a password grant only in their disposable test realm; the checked-in demo realm and browser tests use code + PKCE. It uses the real JWT bearer handler.
+Testcontainers imports isolated realms and starts disposable Keycloak/PostgreSQL
+instances. The suite covers token validation, scoped role mapping, exchange
+permissions, worker boundaries, token renewal/concurrency and cancellation.
+Browser tests run development and Production-mode Compose stacks and verify
+login, PKCE, refresh, logout, secure cookies, container recreation, delegated calls,
+proxy trust, and checked backup/restore operations. API tests enable a password
+grant only in their disposable realm; the demo realm and browser tests use PKCE.
 
-See the [test guide](tests/Keycloak.Starter.IntegrationTests/README.md) for the full matrix and fast-test command. The expiration test uses zero clock skew to avoid waiting for the application's normal grace period.
+For API tests alone:
+
+~~~sh
+dotnet test --project tests/Keycloak.Starter.IntegrationTests
+~~~
+
+[GitHub Actions](.github/workflows/ci.yml) builds Release with warnings as errors,
+runs the shell checks, installs Chromium, executes the tests and runs the smoke
+checks. See [the integration test guide](tests/Keycloak.Starter.IntegrationTests/README.md).
 
 ## Configuration
 
 | Setting | Meaning |
 | --- | --- |
-| `Keycloak__Authority` | Realm issuer URL; required, HTTPS outside Development |
-| `Keycloak__Audience` | Expected API audience; required |
-| `Keycloak__MetadataAddress` | Optional discovery URL for an internal network |
-| `TokenExchange__Enabled` | Enable API A exchange; true in Development/Compose, otherwise false |
-| `TokenExchange__ClientId` | Confidential requester, default `starter-api`; must match A audience |
-| `TokenExchange__ClientSecret` | API A exchange secret; required when enabled |
-| `TokenExchange__Audience` | Fixed supported target `starter-transactions` |
-| `TokenExchange__TransactionsUrl` | API B base URL; HTTPS outside Development |
-| `Worker__Authority` / `Worker__MetadataAddress` | Canonical issuer / optional internal discovery URL |
-| `Worker__ClientId` / `Worker__ClientSecret` | Worker credentials, default client ID `starter-worker` |
-| `Worker__ApiUrl` / `Worker__IntervalSeconds` | API A base URL / interval (default 30s) |
-| `EXCHANGE_CLIENT_SECRET` / `WORKER_CLIENT_SECRET` | Compose client secrets; must match Keycloak |
-| `TRANSACTIONS_PORT` | API B localhost port; default 5160 |
-| `KEYCLOAK_PORT` | Compose's localhost Keycloak port; default 8080 |
-| `API_PORT` | Compose's localhost API port; default 5150 |
+| `Keycloak__Authority` | Canonical realm issuer; HTTPS outside Development |
+| `Keycloak__Audience` | Expected Accounts API audience |
+| `Keycloak__MetadataAddress` | Optional discovery URL; host runs need a host-reachable address |
+| `TokenExchange__Enabled` | Enabled in Development/Compose; otherwise opt in |
+| `TokenExchange__ClientId` / `TokenExchange__ClientSecret` | Accounts exchange credentials; client ID must match its audience |
+| `TokenExchange__Audience` / `TokenExchange__TransactionsUrl` | Transactions audience and base URL |
+| `Worker__Authority` / `Worker__MetadataAddress` | Worker issuer and optional discovery URL |
+| `Worker__ClientId` / `Worker__ClientSecret` | Worker client credentials |
+| `Worker__ApiUrl` / `Worker__IntervalSeconds` | Accounts base URL / polling interval (default 30s) |
+| `KEYCLOAK_PORT`, `API_PORT`, `TRANSACTIONS_PORT`, `WEB_PORT` | Compose host ports: 8080, 5150, 5160, 7002 |
+| `WEB_CLIENT_SECRET`, `EXCHANGE_CLIENT_SECRET`, `WORKER_CLIENT_SECRET` | Compose secrets; values must match Keycloak |
 
-Host development defaults are in `appsettings.Development.json`. Compose sets these values for the API container. PostgreSQL is available only inside the Compose network, and published API/Keycloak ports bind to localhost.
+The checked-in `appsettings.Development.json` files use the default host addresses.
+Production uses separate configuration, HTTPS and deployment credentials; follow
+[PRODUCTION.md](docs/PRODUCTION.md) and [SECURITY.md](docs/SECURITY.md).
 
-For deployment, provide HTTPS authority and discovery URLs through deployment configuration, rotate credentials, and use a properly configured Keycloak production server. Read [the security and deployment notes](docs/SECURITY.md).
+## Alternate workstation setup and existing realms
 
-## CI
+Use this section only when the default ports are occupied or a realm already
+exists. Startup import skips an existing realm; editing the JSON file does not
+update its clients or users. Preserve its data and use reviewed configuration
+changes, or create a separate disposable project for a clean demonstration.
 
-[GitHub Actions](.github/workflows/ci.yml) restores packages, builds Release with warnings as errors, installs Chromium, runs the Testcontainers and Playwright suites, builds a fresh Docker stack, and runs the development smoke checks. It requires no repository secrets.
+For example, run the backend services on alternate ports:
 
-## Stop, reset, and troubleshoot
+~~~sh
+KEYCLOAK_PORT=8082 API_PORT=5152 TRANSACTIONS_PORT=5162 \
+docker compose -p starter-alternate up -d --build --wait --wait-timeout 180 \
+  postgres keycloak api transactions worker
+KEYCLOAK_URL=http://localhost:8082 API_URL=http://localhost:5152 \
+python3 scripts/smoke-test.py
+~~~
+
+The full Web host overrides for these ports are in
+[WEB.md](docs/WEB.md#alternate-workstation-ports-and-existing-realms).
+Docker Desktop users with multiple engines can explicitly select Desktop:
+
+~~~sh
+export DOCKER_CONTEXT=desktop-linux
+export DOCKER_HOST=unix://$HOME/.docker/run/docker.sock
+~~~
+
+These macOS paths are an optional workstation example, not a requirement for other
+platforms. `DOCKER_CONTEXT` selects the CLI/Compose engine; `DOCKER_HOST` supplies
+the Desktop socket to Testcontainers. Use your platform's normal Docker settings
+when only one engine is configured.
+
+## Troubleshooting and limits
 
 ~~~sh
 docker compose down
 docker compose logs --tail=100 keycloak api transactions worker
 ~~~
 
-`down` preserves PostgreSQL data. **`docker compose --profile api down --volumes` deletes this project's database, realm changes, and accounts.** Use that only for disposable data. For a named project, include the same `-p` option when stopping or resetting it.
+`down` preserves data. `docker compose down --volumes` deletes the selected
+project's database and sessions; use it only for disposable data. Include the same
+`-p` option when operating a named project.
 
-Common issues:
+- **401:** check issuer, audience and expiry; keep validation enabled.
+- **403:** check the required client role and scope mapping. Admin and reader are independent.
+- **Exchange returns 502:** check Accounts' confidential-client secret, exchange switch, scope mappings and the user's Transactions role.
+- **Worker acquisition fails:** check its secret, service-account switch and discovery address.
+- **Browser login fails on the host:** verify User Secrets and the host-run authority/metadata/API overrides; `.env` values are not automatically loaded by `dotnet run`.
+- **Missing Web certificate:** run the preparation script before Compose. Retain the certificate with the authentication volume.
+- **Changed realm or database credentials:** startup import and PostgreSQL initialization do not reapply configuration to existing volumes.
 
-- **401 with a token:** check the issuer, expiry, and `aud`. Use the configured hostname consistently. Never fix this by disabling validation.
-- **Token exchange returns 502:** check that the imported `starter-api` client is confidential, exchange-enabled and has B's role scope mapping; `demo-reader` must have B's role. Verify the configured exchange secret. Provider error bodies are intentionally hidden.
-- **Worker token acquisition fails:** check its secret in Keycloak and configuration, service-account switch, canonical issuer and internal discovery address. OAuth errors are retried on the next scheduled job, not in a tight loop.
-- **Worker/API B gets 401:** verify the audience and canonical issuer. Worker tokens target A; user Web tokens target A; exchanged tokens target B.
-- **Missing Web certificate:** run `bash scripts/prepare-web.sh` (or the PowerShell equivalent in the Web guide) before starting the complete stack.
-- **403:** check the service account's role assignment, the client's role scope mappings, and `resource_access.starter-api.roles` in a fresh token.
-- **Demo token request fails after updating the repository:** an older realm may exist in the volume. Use the separate-project example above or deliberately migrate the realm.
-- **Docker test startup fails:** start Docker Desktop, check image registry access, and retry. The tests report container startup logs when initialization fails.
-- **Port already in use:** set `API_PORT` and `KEYCLOAK_PORT` before startup.
-- **Database password changed in .env:** PostgreSQL initialization scripts run only on an empty volume. Changing environment variables does not update existing database-role passwords.
+The Transactions response is fixed sample data. Resource ownership authorization
+and an enforced MFA enrollment/login demonstration are separate follow-up examples;
+they are not implemented here. Other limits include a single Web instance and
+refresh lock, an in-memory worker token cache, no immediate JWT revocation chain,
+and no durable job scheduler. See the architecture and production guides for the
+precise deployment scope.
 
 ## Project map
 
-- `src/Keycloak.Starter.Authentication` — shared Keycloak JWT role normalization for both APIs.
+| Location | Responsibility |
+| --- | --- |
+| `src/Keycloak.Starter.Web` | Razor Pages, OIDC login, persistent server-side tickets |
+| `src/Keycloak.Starter.Api` | Accounts endpoints, role policies, token exchange |
+| `src/Keycloak.Starter.Transactions` | Independent Transactions audience and role validation |
+| `src/Keycloak.Starter.Worker` | Scheduled synchronization checks and cached service tokens |
+| `src/Keycloak.Starter.Authentication` | Shared JWT role mapping and trusted-proxy configuration |
+| `keycloak/realm-export.json` | Development clients, roles, users and audience mappings |
+| `deploy/production` | HTTPS deployment, secret preparation and backup scripts |
+| `tests` | Real-server OAuth, browser and operational checks |
 
-- `src/Keycloak.Starter.Transactions` — independent JWT validation and Transactions policy.
-- `src/Keycloak.Starter.Worker` — sequential job, cached Client Credentials and bearer handler.
-- `src/Keycloak.Starter.Api/Delegation` — focused RFC 8693 service and delegated endpoint.
-- `docs/ARCHITECTURE.md` — exact Keycloak configuration and token lifecycles.
+## License
 
-- `src/Keycloak.Starter.Api/Program.cs` — composition only; Configuration, Security, Endpoints and OpenApi hold the respective behavior.
-- `keycloak/realm-export.json` — reproducible development realm.
-- `db/init/01-create-databases.sh` — database owner creation with safe password quoting.
-- `tests/Keycloak.Starter.IntegrationTests` — real-token security integration tests.
-- `scripts/smoke-test.py` — end-to-end verification of the development stack.
-- `docs/SECURITY.md` — trust boundaries and deployment guidance.
-
-## Try the two new scenarios
-
-After the certificate setup, `docker compose up --build -d` starts Web, API A,
-API B, worker, Keycloak and PostgreSQL. The original `--profile api` and
-`--profile web` invocations still work; services now run by default. To run only
-Keycloak/PostgreSQL for host development, name those services explicitly.
-
-1. Open https://localhost:7002 and sign in as `demo-reader` with
-   `local-reader-password` (accept/trust the local development certificate).
-2. **Profile** and **Reader** call API A with the user's access token.
-3. Open **Transactions**. Web calls `GET /accounts/transactions`; A exchanges
-   that token and calls B. The page displays HTTP 200 and a response such as:
-
-   ~~~json
-   {"sub":"<user-id>","authorizedParty":"starter-api","operation":"read-transactions","transactions":[{"id":"demo-001","amount":42.50,"currency":"MAD"}]}
-   ~~~
-
-4. Run `docker compose logs --tail=30 worker`. A successful periodic check logs
-   `Synchronization status checked successfully (HTTP 200)` without credentials.
-5. Sign in as `demo-unprivileged` / `local-user-password` and open Transactions
-   to see 403. Run the integration suite for direct-token rejection and
-   unauthorized exchange cases, without manually copying user tokens:
-
-   ~~~sh
-   dotnet test --project tests/Keycloak.Starter.IntegrationTests
-   ~~~
-
-The three identities are the browser user (`azp=starter-web`), that same user
-after exchange (`azp=starter-api`, restricted to B), and the worker service
-account (`azp=starter-worker`, `sync` only). Standard Keycloak V2 exchange has
-RFC 8693 impersonation semantics, without an `act` actor chain. It provides the
-user-on-behalf-of API example here; it is not a consent-based actor delegation
-implementation. Client Credentials has no user context and never uses exchange.
-
-To try the worker boundary manually, use the existing curl token example with
-`client_id=starter-worker` and `client_secret=local-demo-worker-secret`, then
-request `http://localhost:5150/sync/status` (200) and
-`http://localhost:5150/accounts/transactions` (403). Do not print or commit the
-token. The worker automatically caches and renews its token.
-
-For host execution of the new projects:
-
-~~~sh
-ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Keycloak.Starter.Transactions
-DOTNET_ENVIRONMENT=Development dotnet run --project src/Keycloak.Starter.Worker
-~~~
-
-Run API A separately using the existing host instructions. The new projects use
-the default host ports (Keycloak 8080, A 5150, B 5160); override the configuration
-above when using other ports. See [the architecture document](docs/ARCHITECTURE.md)
-for exact realm configuration, token lifecycles, trust boundaries, error mapping,
-retry behavior and deployment requirements.
-
-Known limitations: fixed sample transactions (no ownership database),
-single-process in-memory worker cache, no immediate JWT revocation chain, no
-`act` claims or user consent screen for exchange, and a sequential polling job
-rather than durable work processing. Secrets in the realm import are public
-local examples; changing environment variables does not rotate realm secrets.
-The packaged CLI is a separate future example. Existing Web storage deployment
-limits remain documented in [WEB.md](docs/WEB.md).
+The starter is available under the [MIT License](LICENSE), including commercial
+use, modification and redistribution subject to its notice requirements. Bundled
+frontend libraries retain their own copyright and license notices under
+`src/Keycloak.Starter.Web/wwwroot/lib`. The starter is provided without warranty.
