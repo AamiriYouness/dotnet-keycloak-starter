@@ -21,6 +21,10 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
+      - name: Record Docker tooling versions
+        run: |
+          docker version
+          docker compose version
       - name: Check production setup and backup failure handling
         run: |
           sh tests/scripts/production-secrets.sh
@@ -29,7 +33,7 @@ jobs:
       - run: dotnet build Keycloak.Starter.sln -c Release --no-restore --warnaserror
       - name: Install Chromium for browser tests
         run: pwsh tests/Keycloak.Starter.EndToEndTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
-      - run: dotnet test Keycloak.Starter.sln -c Release --no-build
+      - run: dotnet test Keycloak.Starter.sln -c Release --no-build --max-parallel-test-modules 1
       - name: Start a fresh development stack
         run: |
           bash scripts/prepare-web.sh

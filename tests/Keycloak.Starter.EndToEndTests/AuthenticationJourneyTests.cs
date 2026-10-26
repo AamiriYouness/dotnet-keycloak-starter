@@ -8,7 +8,7 @@ public abstract class BrowserJourneys(WebFixture fixture)
 {
     private async Task LoginAsync(IPage page, string username, string password, string target = "/Profile")
     {
-        await page.GotoAsync(fixture.WebUrl + target);
+        await BrowserNavigation.GoToAsync(page, fixture.WebUrl + target);
         await page.Locator("#username").FillAsync(username);
         await page.Locator("#password").FillAsync(password);
         await page.Locator("#kc-login").ClickAsync();
@@ -21,7 +21,7 @@ public abstract class BrowserJourneys(WebFixture fixture)
     {
         await using var context = await fixture.NewContextAsync();
         var page = await context.NewPageAsync();
-        await page.GotoAsync(fixture.WebUrl);
+        await BrowserNavigation.GoToAsync(page, fixture.WebUrl);
         await page.GetByRole(AriaRole.Link, new() { Name = "Privacy and demo data", Exact = true }).ClickAsync();
         Assert.Equal(fixture.WebUrl + "/Privacy", page.Url);
         await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Privacy and demo data", Exact = true })).ToBeVisibleAsync();
@@ -37,7 +37,7 @@ public abstract class BrowserJourneys(WebFixture fixture)
         var page = await context.NewPageAsync();
         var authorizationRequest = page.WaitForRequestAsync(request => request.Url.StartsWith(
             fixture.KeycloakUrl + "/realms/starter/protocol/openid-connect/auth", StringComparison.Ordinal));
-        await page.GotoAsync(fixture.WebUrl + "/Profile");
+        await BrowserNavigation.GoToAsync(page, fixture.WebUrl + "/Profile");
         if (!await page.Locator("#username").IsVisibleAsync())
         {
             var text = await page.Locator("body").InnerTextAsync();
@@ -63,10 +63,10 @@ public abstract class BrowserJourneys(WebFixture fixture)
         await using var context = await fixture.NewContextAsync();
         var page = await context.NewPageAsync();
         await LoginAsync(page, username, password);
-        var first = await page.GotoAsync(fixture.WebUrl + firstPath);
+        var first = await BrowserNavigation.GoToAsync(page, fixture.WebUrl + firstPath);
         Assert.Equal(firstStatus, first!.Status);
         await Expect(page.GetByTestId("api-status")).ToHaveTextAsync("HTTP " + firstStatus);
-        var second = await page.GotoAsync(fixture.WebUrl + secondPath);
+        var second = await BrowserNavigation.GoToAsync(page, fixture.WebUrl + secondPath);
         Assert.Equal(secondStatus, second!.Status);
         await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Access denied" })).ToBeVisibleAsync();
     }
@@ -106,7 +106,7 @@ public abstract class BrowserJourneys(WebFixture fixture)
         Assert.True(session.Secure);
 
         await fixture.RecreateWebAsync();
-        await page.GotoAsync(fixture.WebUrl + "/Profile");
+        await BrowserNavigation.GoToAsync(page, fixture.WebUrl + "/Profile");
 
         await Expect(page.GetByTestId("api-status")).ToHaveTextAsync("HTTP 200");
         Assert.StartsWith(fixture.WebUrl, page.Url);
@@ -120,7 +120,7 @@ public abstract class BrowserJourneys(WebFixture fixture)
         await LoginAsync(page, "demo-reader", "local-reader-password");
         await Task.Delay(TimeSpan.FromSeconds(7), TestContext.Current.CancellationToken);
 
-        await page.GotoAsync(fixture.WebUrl + "/Reader");
+        await BrowserNavigation.GoToAsync(page, fixture.WebUrl + "/Reader");
 
         await Expect(page.GetByTestId("api-status")).ToHaveTextAsync("HTTP 200");
         Assert.StartsWith(fixture.WebUrl, page.Url);
@@ -136,7 +136,7 @@ public abstract class BrowserJourneys(WebFixture fixture)
         await page.GetByRole(AriaRole.Button, new() { Name = "Sign out", Exact = true }).ClickAsync();
         await page.WaitForURLAsync(fixture.WebUrl + "/SignedOut");
         await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "You are signed out." })).ToBeVisibleAsync();
-        await page.GotoAsync(fixture.WebUrl + "/Profile");
+        await BrowserNavigation.GoToAsync(page, fixture.WebUrl + "/Profile");
         await Expect(page.Locator("#username")).ToBeVisibleAsync();
 
         await using var replay = await fixture.NewContextAsync();
@@ -146,7 +146,7 @@ public abstract class BrowserJourneys(WebFixture fixture)
             Path = cookie.Path, Secure = cookie.Secure, HttpOnly = cookie.HttpOnly
         }]);
         var replayPage = await replay.NewPageAsync();
-        await replayPage.GotoAsync(fixture.WebUrl + "/Profile");
+        await BrowserNavigation.GoToAsync(replayPage, fixture.WebUrl + "/Profile");
         await Expect(replayPage.Locator("#username")).ToBeVisibleAsync();
     }
 
@@ -160,7 +160,7 @@ public abstract class BrowserJourneys(WebFixture fixture)
         var response = await context.APIRequest.PostAsync(fixture.WebUrl + "/Account/Logout");
 
         Assert.Equal(400, response.Status);
-        await page.GotoAsync(fixture.WebUrl + "/Profile");
+        await BrowserNavigation.GoToAsync(page, fixture.WebUrl + "/Profile");
         await Expect(page.GetByTestId("api-status")).ToHaveTextAsync("HTTP 200");
     }
 
@@ -169,7 +169,7 @@ public abstract class BrowserJourneys(WebFixture fixture)
     {
         await using var context = await fixture.NewContextAsync();
         var page = await context.NewPageAsync();
-        await page.GotoAsync(fixture.WebUrl + "/Account/Login?returnUrl=https%3A%2F%2Fexample.invalid");
+        await BrowserNavigation.GoToAsync(page, fixture.WebUrl + "/Account/Login?returnUrl=https%3A%2F%2Fexample.invalid");
         await page.Locator("#username").FillAsync("demo-reader");
         await page.Locator("#password").FillAsync("local-reader-password");
         await page.Locator("#kc-login").ClickAsync();
@@ -179,5 +179,6 @@ public abstract class BrowserJourneys(WebFixture fixture)
     }
 }
 
+[Collection(BrowserStackCollection.Name)]
 public sealed class AuthenticationJourneyTests(WebFixture fixture)
     : BrowserJourneys(fixture), IClassFixture<WebFixture>;

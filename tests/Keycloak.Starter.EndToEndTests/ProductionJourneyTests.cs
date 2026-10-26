@@ -5,6 +5,7 @@ using System.Text.Json;
 namespace Keycloak.Starter.EndToEndTests;
 
 [Trait("Category", "Browser")]
+[Collection(BrowserStackCollection.Name)]
 public sealed class ProductionJourneyTests(ProductionWebFixture fixture)
     : BrowserJourneys(fixture), IClassFixture<ProductionWebFixture>
 {
@@ -106,7 +107,10 @@ public sealed class ProductionJourneyTests(ProductionWebFixture fixture)
         using var client = fixture.CreateHttpClient();
         using var challenge = await client.GetAsync(fixture.WebUrl + "/Profile", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Redirect, challenge.StatusCode);
+        var before = (await fixture.ComposeAsync("ps", "-aq")).Split('\n', StringSplitOptions.RemoveEmptyEntries).Order().ToArray();
         var backup = await fixture.CreateCheckedBackupAsync();
+        var after = (await fixture.ComposeAsync("ps", "-aq")).Split('\n', StringSplitOptions.RemoveEmptyEntries).Order().ToArray();
+        Assert.Equal(before, after);
         Assert.True(File.Exists(Path.Combine(backup, "COMPLETE")));
         Assert.False(File.Exists(Path.Combine(backup, "INCOMPLETE")));
         foreach (var file in new[] { "keycloak.dump", "web-auth.tar.gz", "secrets.tar.gz", "deployment-model.json", "images.json" })

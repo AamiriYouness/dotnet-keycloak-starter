@@ -158,7 +158,19 @@ public sealed class ProductionWebFixture : WebFixture
             _project, destination, Path.Combine(_temporary, "secrets") }) start.ArgumentList.Add(argument);
         foreach (var (key, value) in _environment) start.Environment[key] = value;
         start.Environment["STARTER_COMPOSE_OVERRIDE"] = Path.Combine(_temporary, "test-compose.yml");
-        await RunOperationAsync(start);
+        try
+        {
+            await RunOperationAsync(start);
+        }
+        catch (Exception backupFailure)
+        {
+            // Production backup failures intentionally leave services stopped for operator review.
+            // Repair only this disposable test fixture so subsequent tests do not fail by cascade.
+            try { await ComposeAsync("up", "-d", "--no-recreate", "--no-build", "--wait", "--wait-timeout", "240"); }
+            catch (Exception recoveryFailure)
+            { throw new AggregateException("Backup failed and the disposable fixture could not restart.", backupFailure, recoveryFailure); }
+            throw;
+        }
         return destination;
     }
 

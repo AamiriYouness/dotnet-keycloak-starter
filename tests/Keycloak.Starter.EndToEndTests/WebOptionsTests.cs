@@ -4,6 +4,7 @@ using Keycloak.Starter.Web.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Keycloak.Starter.EndToEndTests;
@@ -30,6 +31,8 @@ public sealed class WebOptionsTests : IDisposable
             EnvironmentName = environment,
             ContentRootPath = _root
         });
+        // Rejected settings are asserted below; expected startup failures need not flood CI logs.
+        builder.Logging.ClearProviders();
         var values = new Dictionary<string, string?>
         {
             ["Keycloak:Authority"] = "https://keycloak.example/realms/starter",
