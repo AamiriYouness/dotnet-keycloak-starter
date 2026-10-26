@@ -28,6 +28,14 @@ starter_dc() {
     fi
 }
 starter_dc config --quiet
+# Validate the restart command before any service is stopped (Compose versions differ).
+starter_up_help=$(starter_dc up --help)
+for starter_option in --no-recreate --no-build --wait --wait-timeout; do
+    case "$starter_up_help" in
+        *"$starter_option"*) ;;
+        *) printf '%s\n' "Docker Compose up does not support $starter_option; upgrade Compose before taking a backup." >&2; exit 1 ;;
+    esac
+done
 starter_web=$(starter_dc ps -aq web)
 [ -n "$starter_web" ] || { echo 'The selected project has no Web container to archive.' >&2; exit 1; }
 # Atomic creation: a concurrent invocation cannot truncate an existing backup.
@@ -67,8 +75,9 @@ tar -tzf "$starter_backup/web-auth.tar.gz" > /dev/null
 # Follow certificate symlinks so recovery does not depend on paths on the original host.
 tar -h -C "$DEPLOYMENT_SECRETS_DIR" -czf "$starter_backup/secrets.tar.gz" .
 tar -tzf "$starter_backup/secrets.tar.gz" > /dev/null
-# Restart exactly the quiesced services; do not recreate containers or change their configuration.
-starter_dc start --wait --wait-timeout 240 keycloak api transactions internal-proxy web gateway worker
+# Restart the quiesced services without recreating containers or building images.
+# up --wait is supported by Compose versions that do not support start --wait.
+starter_dc up -d --no-recreate --no-build --wait --wait-timeout 240 keycloak api transactions internal-proxy web gateway worker
 rm "$starter_backup/INCOMPLETE"
 printf '%s\n' 'Database and archives validated; configuration, secrets and image metadata captured; services restarted.' > "$starter_backup/COMPLETE"
 printf '%s\n' "Backup complete: $starter_backup. Encrypt it before copying off-host; verify recovery in an isolated deployment."

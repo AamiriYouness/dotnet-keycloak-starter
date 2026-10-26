@@ -29,6 +29,12 @@ if [ "$1" = run ]; then
     exit 0
 fi
 case "$*" in
+    *'start --wait'*) printf '%s\n' 'unknown flag: --wait' >&2; exit 64 ;;
+    *'up --help'*)
+        if [ "${STARTER_FAIL_PHASE:-}" = capabilities ]; then printf '%s\n' '--no-recreate --no-build --wait'
+        else printf '%s\n' '--no-recreate --no-build --wait --wait-timeout'; fi ;;
+    *'up -d --no-recreate --no-build --wait --wait-timeout 240 '*)
+        if [ "${STARTER_FAIL_PHASE:-}" = restart ]; then exit 44; fi ;;
     *'config --format json'*) jq -n --arg source "$STARTER_TEST_REALM" '{services:{keycloak:{volumes:[{source:$source,target:"/opt/keycloak/data/import/starter-realm.json"}]}}}' ;;
     *'ps -aq web'*) printf '%s\n' fake-web-container ;;
     *'images --format json'*) printf '%s\n' '[]' ;;
@@ -40,19 +46,30 @@ chmod 700 "$starter_test/stubs/docker"
 export PATH="$starter_test/stubs:$PATH"
 # An inherited live path must be replaced by the script's explicit fourth argument.
 export DEPLOYMENT_SECRETS_DIR=/this/live/path/must/not/be/used
-for starter_phase in dump archive; do
+for starter_phase in dump archive restart; do
     : > "$STARTER_BACKUP_LOG"
     starter_status=0
     STARTER_FAIL_PHASE="$starter_phase" sh "$starter_script" "$starter_test/deployment.env" test-prod \
         "$starter_test/failed-$starter_phase" "$STARTER_EXPECTED_SECRETS" > "$starter_test/$starter_phase.log" 2>&1 || starter_status=$?
-    case "$starter_phase" in dump) test "$starter_status" -eq 42 ;; archive) test "$starter_status" -eq 43 ;; esac
+    case "$starter_phase" in dump) test "$starter_status" -eq 42 ;; archive) test "$starter_status" -eq 43 ;; restart) test "$starter_status" -eq 44 ;; esac
     test -f "$starter_test/failed-$starter_phase/INCOMPLETE"
     test ! -e "$starter_test/failed-$starter_phase/COMPLETE"
     grep -q 'Backup failed' "$starter_test/$starter_phase.log"
-    if grep -q 'start --wait' "$STARTER_BACKUP_LOG"; then echo 'Restart was attempted after a failed backup.' >&2; exit 1; fi
+    if [ "$starter_phase" != restart ] && grep -q 'up -d --no-recreate' "$STARTER_BACKUP_LOG"; then
+        echo 'Restart was attempted after a failed backup.' >&2; exit 1
+    fi
 done
 : > "$STARTER_BACKUP_LOG"
+starter_status=0
+STARTER_FAIL_PHASE=capabilities sh "$starter_script" "$starter_test/deployment.env" test-prod \
+    "$starter_test/unsupported" "$STARTER_EXPECTED_SECRETS" > "$starter_test/unsupported.log" 2>&1 || starter_status=$?
+test "$starter_status" -ne 0
+test ! -e "$starter_test/unsupported"
+if grep -q ' stop ' "$STARTER_BACKUP_LOG"; then echo 'Services stopped before detecting unsupported Compose flags.' >&2; exit 1; fi
+grep -q 'upgrade Compose before taking a backup' "$starter_test/unsupported.log"
+: > "$STARTER_BACKUP_LOG"
 sh "$starter_script" "$starter_test/deployment.env" test-prod "$starter_test/complete" "$STARTER_EXPECTED_SECRETS" > "$starter_test/complete.log" 2>&1
+grep -q 'up -d --no-recreate --no-build --wait --wait-timeout 240' "$STARTER_BACKUP_LOG"
 test -f "$starter_test/complete/COMPLETE"
 test ! -e "$starter_test/complete/INCOMPLETE"
 test -s "$starter_test/complete/keycloak.dump"
@@ -65,4 +82,4 @@ sh "$starter_script" "$starter_test/deployment.env" test-prod "$starter_test/com
 test "$starter_status" -ne 0
 grep -q '^sentinel$' "$starter_test/complete/keycloak.dump"
 test ! -s "$STARTER_BACKUP_LOG"
-printf '%s\n' 'Production backup checks passed (dump/archive failure, completion marker, explicit secret path, and overwrite refusal).'
+printf '%s\n' 'Production backup checks passed (dump/archive/restart failures, Compose compatibility preflight, completion marker, secret path, and overwrite refusal).'
