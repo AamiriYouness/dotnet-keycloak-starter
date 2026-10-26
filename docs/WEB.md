@@ -234,8 +234,13 @@ pwsh tests/Keycloak.Starter.EndToEndTests/bin/Release/net10.0/playwright.ps1 ins
 Then run the suite normally:
 
 ~~~sh
-dotnet test Keycloak.Starter.sln -c Release
+dotnet test Keycloak.Starter.sln -c Release --max-parallel-test-modules 1
 ~~~
+
+Browser fixtures run sequentially; the full-suite command also serializes test
+modules to avoid Docker network changes interrupting Chromium on Linux. An initial
+GET interrupted by exactly `ERR_NETWORK_CHANGED` is retried once; connection,
+certificate, authentication-action and assertion failures are not retried.
 
 The browser journeys verify login/PKCE, role checks, Transactions exchange,
 refresh, logout, CSRF, local return URLs, secure cookies, session survival after

@@ -252,7 +252,7 @@ Requirements: .NET 10, Docker, and Playwright Chromium for browser tests. Follow
 [the browser installation steps](docs/WEB.md#browser-tests) on first use.
 
 ~~~sh
-dotnet test
+dotnet test --max-parallel-test-modules 1
 ~~~
 
 Testcontainers imports isolated realms and starts disposable Keycloak/PostgreSQL
@@ -262,6 +262,10 @@ Browser tests run development and Production-mode Compose stacks and verify
 login, PKCE, refresh, logout, secure cookies, container recreation, delegated calls,
 proxy trust, and checked backup/restore operations. API tests enable a password
 grant only in their disposable realm; the demo realm and browser tests use PKCE.
+
+The full-suite command serializes test modules; browser fixtures also run
+sequentially. This prevents Docker network creation/removal in another fixture
+from interrupting Chromium navigation on Linux runners.
 
 For API tests alone:
 

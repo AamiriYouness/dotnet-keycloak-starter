@@ -272,17 +272,17 @@ The parent backup directory must exist and be writable. The destination
 `release-001` must **not** exist, even if a previous attempt failed. The script:
 
 - Explicitly selects the secret directory supplied as its fourth argument.
-- Validates Compose configuration and finds the Web container before stopping services.
+- Validates Compose configuration, required `up` flags and the Web container before stopping services.
 - Creates a fresh 0700 directory and writes an `INCOMPLETE` marker.
 - Checks the database dump and its `pg_restore --list` output.
 - Checks the Web archive and secret archive using `tar -tzf`.
 - Captures deployment configuration, the realm input, source revision when available,
   and image metadata. Secret symlinks are dereferenced into the archive.
-- Restarts the quiesced containers and writes `COMPLETE` only after every step succeeds.
+- Restarts using `up --no-recreate --no-build --wait` (not the newer `start --wait` flags), preserving container IDs, and writes `COMPLETE` only after every step succeeds.
 
 A nonzero exit leaves an incomplete directory and an actionable error; services
 may remain stopped. Inspect the cause before explicitly restarting the selected
-project with `dc start --wait`. Do not continue a recovery drill using that directory.
+project with `dc up -d --no-recreate --no-build --wait --wait-timeout 240`. Do not continue a recovery drill using that directory.
 Rerunning with the same destination fails before truncating any existing artifact.
 Archive listing checks detect basic corruption, but do not replace a restore drill.
 
@@ -441,7 +441,7 @@ does not imply Keycloak database downgrade compatibility. Never use
 
 ## Automated validation and limitations
 
-With Docker Desktop selected and Playwright Chromium installed, run `dotnet test`.
+With Docker Desktop selected and Playwright Chromium installed, run `dotnet test --max-parallel-test-modules 1`.
 Run `sh tests/scripts/production-secrets.sh` with OpenSSL and jq to check the
 setup script's successful output, permissions, refusal to overwrite, intermediate
 key removal and injected OpenSSL failures. Run

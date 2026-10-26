@@ -59,7 +59,7 @@ On this workstation select Docker Desktop for both clients:
 ```sh
 export DOCKER_CONTEXT=desktop-linux
 export DOCKER_HOST=unix://$HOME/.docker/run/docker.sock
-dotnet test
+dotnet test --max-parallel-test-modules 1
 ```
 
 The complete solution additionally requires Playwright Chromium, as documented
